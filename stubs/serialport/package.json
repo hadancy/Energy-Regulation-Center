@@ -1,0 +1,7 @@
+{
+  "name": "serialport",
+  "version": "13.0.0",
+  "description": "Local TCP-only stub used to avoid bundling native serialport bindings.",
+  "main": "index.js",
+  "private": true
+}

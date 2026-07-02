@@ -1,0 +1,70 @@
+<svg width="1920" height="108" viewBox="0 0 1920 108" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cyanStroke" x1="0" y1="54" x2="1920" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#045C99" stop-opacity="0.1" />
+      <stop offset="0.18" stop-color="#008CEB" stop-opacity="0.75" />
+      <stop offset="0.5" stop-color="#28E7FF" />
+      <stop offset="0.82" stop-color="#008CEB" stop-opacity="0.75" />
+      <stop offset="1" stop-color="#045C99" stop-opacity="0.1" />
+    </linearGradient>
+    <linearGradient id="deepPanel" x1="960" y1="8" x2="960" y2="91" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#052C56" stop-opacity="0.8" />
+      <stop offset="0.48" stop-color="#02172E" stop-opacity="0.72" />
+      <stop offset="1" stop-color="#020814" stop-opacity="0.08" />
+    </linearGradient>
+    <linearGradient id="lineGlow" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#006FEF" stop-opacity="0" />
+      <stop offset="0.22" stop-color="#00A7FF" />
+      <stop offset="0.5" stop-color="#45F3FF" />
+      <stop offset="0.78" stop-color="#00A7FF" />
+      <stop offset="1" stop-color="#006FEF" stop-opacity="0" />
+    </linearGradient>
+    <filter id="glow" x="-8%" y="-160%" width="116%" height="420%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="2.8" result="blur" />
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.000 0 0 0 0 0.700 0 0 0 0 1.000 0 0 0 0.78 0" />
+      <feMerge>
+        <feMergeNode />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="softGlow" x="-8%" y="-100%" width="116%" height="300%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="7" />
+    </filter>
+  </defs>
+
+  <path d="M6 51H578L602 72H774L803 95H1117L1146 72H1318L1342 51H1914" stroke="#055B9D" stroke-width="6" stroke-opacity="0.22" />
+  <path d="M16 18H552L578 38H697L729 10H1191L1223 38H1342L1368 18H1904" stroke="#055B9D" stroke-width="5" stroke-opacity="0.24" />
+
+  <path d="M696 12H830L800 47H726L696 12Z" fill="url(#deepPanel)" fill-opacity="0.42" stroke="#0089E9" stroke-width="1.5" stroke-opacity="0.8" />
+  <path d="M1224 12H1090L1120 47H1194L1224 12Z" fill="url(#deepPanel)" fill-opacity="0.42" stroke="#0089E9" stroke-width="1.5" stroke-opacity="0.8" />
+  <path d="M722 20H812L797 42H742L722 20Z" stroke="#20E4FF" stroke-width="1.2" stroke-opacity="0.78" filter="url(#glow)" />
+  <path d="M1198 20H1108L1123 42H1178L1198 20Z" stroke="#20E4FF" stroke-width="1.2" stroke-opacity="0.78" filter="url(#glow)" />
+  <path d="M805 76H850L834 91H805V76Z" fill="#00A6FF" opacity="0.1" />
+  <path d="M1115 76H1070L1086 91H1115V76Z" fill="#00A6FF" opacity="0.1" />
+
+  <path d="M4 50H574L598 71H771L801 94H1119L1149 71H1322L1346 50H1916" stroke="url(#cyanStroke)" stroke-width="1.4" filter="url(#glow)" />
+  <path d="M16 18H552L578 38H697L729 10H1191L1223 38H1342L1368 18H1904" stroke="url(#cyanStroke)" stroke-width="1.2" filter="url(#glow)" />
+  <path d="M0 85H594L616 101H1304L1326 85H1920" stroke="#007FDB" stroke-width="1" stroke-opacity="0.55" />
+  <path d="M0 92H590L608 104H1312L1330 92H1920" stroke="#001B3D" stroke-width="3" stroke-opacity="0.75" />
+
+  <g opacity="0.95" filter="url(#glow)">
+    <path d="M596 29H619L637 48H614L596 29Z" fill="#149DFF" />
+    <path d="M632 29H655L673 48H650L632 29Z" fill="#149DFF" />
+    <path d="M668 29H691L709 48H686L668 29Z" fill="#149DFF" />
+    <path d="M1324 29H1301L1283 48H1306L1324 29Z" fill="#149DFF" />
+    <path d="M1288 29H1265L1247 48H1270L1288 29Z" fill="#149DFF" />
+    <path d="M1252 29H1229L1211 48H1234L1252 29Z" fill="#149DFF" />
+  </g>
+
+  <g opacity="0.55">
+    <path d="M407 33H566" stroke="#0074D9" stroke-width="1" />
+    <path d="M1354 33H1513" stroke="#0074D9" stroke-width="1" />
+    <path d="M36 51H214" stroke="#003E75" stroke-width="1" />
+    <path d="M1706 51H1884" stroke="#003E75" stroke-width="1" />
+  </g>
+
+  <path d="M610 82H810" stroke="#00C8FF" stroke-width="8" stroke-opacity="0.12" filter="url(#softGlow)" />
+  <path d="M1110 82H1310" stroke="#00C8FF" stroke-width="8" stroke-opacity="0.12" filter="url(#softGlow)" />
+  <path d="M742 12H838" stroke="#31EFFF" stroke-width="5" stroke-opacity="0.16" filter="url(#softGlow)" />
+  <path d="M1082 12H1178" stroke="#31EFFF" stroke-width="5" stroke-opacity="0.16" filter="url(#softGlow)" />
+</svg>

@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+@import './base.css';
+
+#app {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+}
+
+.app-drag-region {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag,
+.app-no-drag * {
+  -webkit-app-region: no-drag;
+}
+
+.admin-menu {
+  --el-menu-active-color: #0891b2;
+  --el-menu-hover-bg-color: #ecfeff;
+  --el-menu-bg-color: transparent;
+  width: 100%;
+  border-right: 0;
+}
+
+.admin-menu.el-menu--collapse {
+  width: 100%;
+}
+
+.admin-menu .el-menu-item {
+  height: 44px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  color: #475569;
+}
+
+.admin-menu .el-menu-item.is-active {
+  background: #ecfeff;
+  color: #0e7490;
+  font-weight: 600;
+}
+
+.admin-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.admin-card .el-card__header {
+  border-bottom-color: #eef2f7;
+}
+
+.stat-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.stat-icon--cyan {
+  color: #0e7490;
+  background: #ecfeff;
+}
+
+.stat-icon--emerald {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+.stat-icon--amber {
+  color: #b45309;
+  background: #fffbeb;
+}
+
+.stat-icon--rose {
+  color: #be123c;
+  background: #fff1f2;
+}
+
+.chart-bar {
+  flex: 1;
+  min-width: 18px;
+  border-radius: 8px 8px 2px 2px;
+}
+
+.dataset-filter .el-date-editor.el-input__wrapper {
+  width: 100%;
+  min-width: 0;
+}

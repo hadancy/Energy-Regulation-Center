@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import {
   // Bell,
-  DataAnalysis,
   Fold,
   House,
   MagicStick,
@@ -13,6 +12,7 @@ import {
   Tickets
   // UserFilled
 } from '@element-plus/icons-vue'
+import appIcon from '../assets/app-icon.svg'
 
 const route = useRoute()
 const isCollapse = ref(false)
@@ -54,10 +54,8 @@ const closeMobileMenu = (): void => {
       class="app-drag-region sticky top-0 hidden h-screen border-r border-slate-200 bg-white/95 transition-all duration-300 md:flex md:flex-col"
     >
       <div class="flex h-24 items-end gap-3 border-b border-slate-100 px-5 pb-4">
-        <div class="grid h-10 w-10 place-items-center rounded-lg bg-cyan-600 text-white shadow-sm">
-          <el-icon :size="20">
-            <DataAnalysis />
-          </el-icon>
+        <div class="h-10 w-10 overflow-hidden rounded-lg shadow-sm ring-1 ring-cyan-100/70">
+          <img class="h-full w-full object-cover" :src="appIcon" alt="" draggable="false" />
         </div>
         <div v-show="!isCollapse" class="leading-tight">
           <p class="text-sm font-semibold text-slate-950">能源调控中心</p>

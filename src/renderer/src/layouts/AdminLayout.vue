@@ -2,14 +2,15 @@
 import { computed, ref } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import {
+  Connection,
   // Bell,
   Fold,
   House,
   MagicStick,
   Menu as MenuIcon,
   // Search,
-  // Setting,
-  Tickets
+  Setting
+  // Tickets
   // UserFilled
 } from '@element-plus/icons-vue'
 import appIcon from '../assets/app-icon.svg'
@@ -24,9 +25,10 @@ const pageTitle = computed(() => String(route.meta.title ?? '后台管理'))
 const menuItems = [
   { path: '/dashboard', title: '监控总览', icon: House },
   { path: '/prediction', title: '天气模型', icon: MagicStick },
-  { path: '/datasets', title: '能源模型', icon: Tickets }
+  { path: '/plc-test', title: 'PLC连接测试', icon: Connection },
+  // { path: '/datasets', title: '能源模型', icon: Tickets }
   // 能源预测
-  // { path: '/settings', title: '能源预测', icon: Setting }
+  { path: '/settings', title: '设置', icon: Setting }
 ]
 
 const toggleCollapse = (): void => {

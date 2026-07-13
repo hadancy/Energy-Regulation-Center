@@ -683,7 +683,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="grid min-h-0 grid-rows-[58fr_42fr] gap-[0.8vh]">
+  <section class="grid min-h-0 grid-rows-[55fr_45fr] gap-[0.8vh]">
     <section class="tech-panel min-h-0">
       <header class="panel-heading">
         <span class="panel-heading__icon">

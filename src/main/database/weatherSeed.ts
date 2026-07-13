@@ -1,291 +1,359 @@
+export type WeatherSeason = '春秋' | '夏' | '冬'
+
+export const WEATHER_SEASONS: WeatherSeason[] = ['春秋', '夏', '冬']
+
 export interface WeatherSeedRecord {
-  day: number
+  season: WeatherSeason
+  date: string
   humidity: number
   temperature: number
   weather: string
   precipitation: number
   sunrise: string
   sunset: string
+  sunlightMax: string
 }
 
 export const WEATHER_SEED_RECORDS: WeatherSeedRecord[] = [
   {
-    day: 1,
+    season: '春秋',
+    date: '2026-04-01',
     humidity: 45.5,
-    temperature: 6.4,
+    temperature: 14.4,
     weather: '晴天',
     precipitation: 0,
     sunrise: '06:00',
-    sunset: '20:00'
+    sunset: '20:00',
+    sunlightMax: '12:30'
   },
   {
-    day: 2,
+    season: '春秋',
+    date: '2026-04-02',
     humidity: 46.6,
-    temperature: 8.6,
+    temperature: 15.6,
     weather: '晴天',
     precipitation: 0,
     sunrise: '06:02',
-    sunset: '20:02'
+    sunset: '20:02',
+    sunlightMax: '12:32'
   },
   {
-    day: 3,
+    season: '春秋',
+    date: '2026-04-03',
     humidity: 78.7,
-    temperature: 8.7,
+    temperature: 16.7,
     weather: '雨天',
     precipitation: 0,
     sunrise: '06:04',
-    sunset: '20:04'
+    sunset: '20:04',
+    sunlightMax: '12:34'
   },
   {
-    day: 4,
+    season: '春秋',
+    date: '2026-04-04',
     humidity: 76.5,
-    temperature: 6.5,
+    temperature: 14.5,
     weather: '雨天',
     precipitation: 0,
     sunrise: '06:06',
-    sunset: '20:06'
+    sunset: '20:06',
+    sunlightMax: '12:36'
   },
   {
-    day: 5,
+    season: '春秋',
+    date: '2026-04-05',
     humidity: 60.6,
-    temperature: 5.4,
+    temperature: 10.4,
     weather: '晴天',
     precipitation: 0,
     sunrise: '06:08',
-    sunset: '20:08'
+    sunset: '20:08',
+    sunlightMax: '12:38'
   },
   {
-    day: 6,
+    season: '春秋',
+    date: '2026-04-06',
     humidity: 88.4,
-    temperature: -2.4,
-    weather: '雪',
+    temperature: 10.2,
+    weather: '雨天',
     precipitation: 3.5,
     sunrise: '06:10',
-    sunset: '20:10'
+    sunset: '20:10',
+    sunlightMax: '12:40'
   },
   {
-    day: 7,
+    season: '春秋',
+    date: '2026-04-07',
     humidity: 98.8,
-    temperature: -5.7,
-    weather: '暴雪',
+    temperature: 13.7,
+    weather: '雨天',
     precipitation: 4.6,
     sunrise: '06:12',
-    sunset: '20:12'
+    sunset: '20:12',
+    sunlightMax: '12:42'
   },
   {
-    day: 8,
+    season: '春秋',
+    date: '2026-04-08',
     humidity: 95.7,
-    temperature: 2.8,
-    weather: '雨天',
+    temperature: 12.9,
+    weather: '强风',
     precipitation: 12,
     sunrise: '06:14',
-    sunset: '20:14'
+    sunset: '20:14',
+    sunlightMax: '12:44'
   },
   {
-    day: 9,
+    season: '春秋',
+    date: '2026-04-09',
     humidity: 85.9,
-    temperature: 6.1,
-    weather: '雨天',
+    temperature: 13.1,
+    weather: '强风',
     precipitation: 13.4,
     sunrise: '06:16',
-    sunset: '20:16'
+    sunset: '20:16',
+    sunlightMax: '12:46'
   },
   {
-    day: 10,
+    season: '春秋',
+    date: '2026-04-10',
     humidity: 89.5,
-    temperature: 4.6,
+    temperature: 14.6,
     weather: '晴天',
     precipitation: 0,
     sunrise: '06:18',
-    sunset: '20:18'
+    sunset: '20:18',
+    sunlightMax: '12:48'
   },
   {
-    day: 11,
+    season: '夏',
+    date: '2026-08-01',
     humidity: 89.4,
-    temperature: -1.6,
-    weather: '雪',
-    precipitation: 3.4,
-    sunrise: '06:20',
-    sunset: '20:20'
+    temperature: 21.6,
+    weather: '晴天',
+    precipitation: 0,
+    sunrise: '07:41',
+    sunset: '19:58',
+    sunlightMax: '13:00'
   },
   {
-    day: 12,
+    season: '夏',
+    date: '2026-08-02',
     humidity: 95.1,
-    temperature: 0.8,
-    weather: '雪',
-    precipitation: 2.5,
-    sunrise: '06:22',
-    sunset: '20:22'
+    temperature: 20.8,
+    weather: '晴天',
+    precipitation: 0,
+    sunrise: '07:42',
+    sunset: '20:00',
+    sunlightMax: '13:02'
   },
   {
-    day: 13,
+    season: '夏',
+    date: '2026-08-03',
     humidity: 95.5,
-    temperature: 3.7,
+    temperature: 23.7,
     weather: '雨天',
     precipitation: 7.5,
-    sunrise: '06:24',
-    sunset: '20:24'
+    sunrise: '07:43',
+    sunset: '20:02',
+    sunlightMax: '13:04'
   },
   {
-    day: 14,
+    season: '夏',
+    date: '2026-08-04',
     humidity: 46.6,
-    temperature: 6.1,
+    temperature: 26.1,
     weather: '晴天',
     precipitation: 0,
-    sunrise: '06:26',
-    sunset: '20:26'
+    sunrise: '07:44',
+    sunset: '20:04',
+    sunlightMax: '13:06'
   },
   {
-    day: 15,
+    season: '夏',
+    date: '2026-08-05',
     humidity: 45.7,
-    temperature: 8.6,
+    temperature: 28.6,
     weather: '晴天',
     precipitation: 0,
-    sunrise: '06:28',
-    sunset: '20:28'
+    sunrise: '07:46',
+    sunset: '20:06',
+    sunlightMax: '13:08'
   },
   {
-    day: 16,
+    season: '夏',
+    date: '2026-08-06',
     humidity: 84.5,
-    temperature: 7.1,
+    temperature: 27.1,
     weather: '晴天',
     precipitation: 0,
-    sunrise: '06:30',
-    sunset: '20:30'
+    sunrise: '07:47',
+    sunset: '20:08',
+    sunlightMax: '13:10'
   },
   {
-    day: 17,
+    season: '夏',
+    date: '2026-08-07',
     humidity: 55.7,
-    temperature: 11.2,
+    temperature: 21.2,
     weather: '晴天',
     precipitation: 0,
-    sunrise: '06:32',
-    sunset: '20:32'
+    sunrise: '07:48',
+    sunset: '20:10',
+    sunlightMax: '13:12'
   },
   {
-    day: 18,
+    season: '夏',
+    date: '2026-08-08',
     humidity: 46.5,
-    temperature: 15.5,
+    temperature: 25.5,
     weather: '晴天',
     precipitation: 0,
-    sunrise: '06:34',
-    sunset: '20:34'
+    sunrise: '07:49',
+    sunset: '20:12',
+    sunlightMax: '13:14'
   },
   {
-    day: 19,
+    season: '夏',
+    date: '2026-08-09',
     humidity: 45.7,
-    temperature: 14.5,
-    weather: '晴天',
-    precipitation: 0,
-    sunrise: '06:36',
-    sunset: '20:36'
+    temperature: 24.5,
+    weather: '雨天',
+    precipitation: 7.5,
+    sunrise: '07:50',
+    sunset: '20:14',
+    sunlightMax: '13:16'
   },
   {
-    day: 20,
+    season: '夏',
+    date: '2026-08-10',
     humidity: 48.3,
-    temperature: 16.2,
-    weather: '晴天',
-    precipitation: 0,
-    sunrise: '06:38',
-    sunset: '20:38'
+    temperature: 26.2,
+    weather: '雨天',
+    precipitation: 7.5,
+    sunrise: '07:52',
+    sunset: '20:16',
+    sunlightMax: '13:18'
   },
   {
-    day: 21,
+    season: '冬',
+    date: '2026-01-01',
     humidity: 55.3,
-    temperature: 8.7,
+    temperature: 4.6,
     weather: '晴天',
     precipitation: 0,
-    sunrise: '06:40',
-    sunset: '20:40'
+    sunrise: '07:49',
+    sunset: '17:41',
+    sunlightMax: '12:40'
   },
   {
-    day: 22,
+    season: '冬',
+    date: '2026-01-02',
     humidity: 75.4,
     temperature: 2.6,
     weather: '雨天',
     precipitation: 4.3,
-    sunrise: '06:42',
-    sunset: '20:42'
+    sunrise: '07:51',
+    sunset: '17:43',
+    sunlightMax: '12:42'
   },
   {
-    day: 23,
+    season: '冬',
+    date: '2026-01-03',
     humidity: 65.7,
-    temperature: 6.7,
+    temperature: 1.5,
     weather: '强风',
     precipitation: 0,
-    sunrise: '06:44',
-    sunset: '20:44'
+    sunrise: '07:53',
+    sunset: '17:45',
+    sunlightMax: '12:44'
   },
   {
-    day: 24,
+    season: '冬',
+    date: '2026-01-04',
     humidity: 74.5,
     temperature: 2.4,
     weather: '雪',
     precipitation: 4.2,
-    sunrise: '06:46',
-    sunset: '20:46'
+    sunrise: '07:55',
+    sunset: '17:47',
+    sunlightMax: '12:46'
   },
   {
-    day: 25,
+    season: '冬',
+    date: '2026-01-05',
     humidity: 76.7,
     temperature: 0.9,
     weather: '雪',
     precipitation: 4.3,
-    sunrise: '06:48',
-    sunset: '20:48'
+    sunrise: '07:57',
+    sunset: '17:49',
+    sunlightMax: '12:48'
   },
   {
-    day: 26,
+    season: '冬',
+    date: '2026-01-06',
     humidity: 94.3,
     temperature: -5.4,
     weather: '暴雪',
     precipitation: 5.1,
-    sunrise: '06:50',
-    sunset: '20:50'
+    sunrise: '07:59',
+    sunset: '17:51',
+    sunlightMax: '12:50'
   },
   {
-    day: 27,
+    season: '冬',
+    date: '2026-01-07',
     humidity: 97.7,
     temperature: -3.7,
     weather: '暴雪',
     precipitation: 5.5,
-    sunrise: '06:52',
-    sunset: '20:52'
+    sunrise: '08:01',
+    sunset: '17:53',
+    sunlightMax: '12:52'
   },
   {
-    day: 28,
+    season: '冬',
+    date: '2026-01-08',
     humidity: 87.8,
     temperature: -5.8,
     weather: '暴雪',
     precipitation: 5.3,
-    sunrise: '06:54',
-    sunset: '20:54'
+    sunrise: '08:03',
+    sunset: '17:55',
+    sunlightMax: '12:54'
   },
   {
-    day: 29,
+    season: '冬',
+    date: '2026-01-09',
     humidity: 87.7,
-    temperature: 5.2,
+    temperature: 1.6,
     weather: '雨天',
     precipitation: 14.5,
-    sunrise: '06:56',
-    sunset: '20:56'
+    sunrise: '08:05',
+    sunset: '17:57',
+    sunlightMax: '12:56'
   },
   {
-    day: 30,
+    season: '冬',
+    date: '2026-01-10',
     humidity: 89.4,
-    temperature: 7.7,
+    temperature: -1,
     weather: '雨天',
     precipitation: 5.6,
-    sunrise: '06:58',
-    sunset: '20:58'
+    sunrise: '08:07',
+    sunset: '17:59',
+    sunlightMax: '12:58'
   },
   {
-    day: 31,
+    season: '冬',
+    date: '2026-01-11',
     humidity: 58.4,
-    temperature: 6.1,
+    temperature: 3.2,
     weather: '晴天',
     precipitation: 0,
-    sunrise: '07:00',
-    sunset: '21:00'
+    sunrise: '08:09',
+    sunset: '18:01',
+    sunlightMax: '13:00'
   }
 ]

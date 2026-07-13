@@ -25,6 +25,12 @@ const router = createRouter({
           meta: { title: '天气模型' }
         },
         {
+          path: 'plc-test',
+          name: 'PlcConnectionTest',
+          component: () => import('@renderer/views/plc-test/index.vue'),
+          meta: { title: 'PLC连接测试' }
+        },
+        {
           path: 'datasets',
           name: 'Datasets',
           component: () => import('@renderer/views/datasets/index.vue'),

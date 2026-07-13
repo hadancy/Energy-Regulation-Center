@@ -5,7 +5,8 @@ import icon from '../../resources/icon.png?asset'
 import { registerCameraIpc, startCameraProxy, stopCameraProxy } from './camera'
 import { closeWeatherDatabase } from './database/weatherRepository'
 import { registerWeatherIpc } from './database/weatherIpc'
-import { registerPlcIpc, startPlcPolling, stopPlcPolling } from './plc'
+import { registerPlcIpc, stopPlcPolling } from './plc'
+import { registerExternalAppIpc } from './externalApp'
 
 function createWindow(): void {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
@@ -77,9 +78,9 @@ app.whenReady().then(async () => {
   registerCameraIpc()
   registerWeatherIpc()
   registerPlcIpc()
+  registerExternalAppIpc()
 
   await startCameraProxy()
-  startPlcPolling()
   createWindow()
 
   app.on('activate', function () {

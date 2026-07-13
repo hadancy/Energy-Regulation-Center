@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import {
   Back,
-  Calendar
+  Calendar,
+  Monitor
   // PartlyCloudy
 } from '@element-plus/icons-vue'
 import dashboardTopFrame from '@renderer/assets/dashboard-top-frame.svg'
@@ -14,13 +16,34 @@ import MonitorPanels from './MonitorPanels.vue'
 import WeatherForecastPanel from './WeatherForecastPanel.vue'
 
 const router = useRouter()
-const currentMonthDate = new Date()
-const selectedDate = ref(new Date())
+const dashboardYear = new Date().getFullYear()
+const allowedDashboardDates = [
+  new Date(dashboardYear, 0, 3),
+  new Date(dashboardYear, 3, 3),
+  new Date(dashboardYear, 7, 3)
+]
+const selectedDate = ref(new Date(dashboardYear, 3, 3))
+const pickerDate = ref(new Date(dashboardYear, 3, 3))
+const datePickerRef = ref<{
+  handleClose: () => void
+  blur: () => void
+}>()
+const weatherPredictionToken = ref(0)
 const clockNow = ref(new Date())
+const isDashboardDateWriting = ref(false)
+const externalAppSettings = ref({ path: '', name: '' })
+const isExternalAppLaunching = ref(false)
 
 let clockTimer: number | null = null
 
+type WeatherSeason = Parameters<typeof window.api.weather.forecast>[0]['season']
+type WeatherRecord = Awaited<ReturnType<typeof window.api.weather.forecast>>[number]
+
 const selectedDay = computed(() => selectedDate.value.getDate())
+const selectedSeason = computed<WeatherSeason>(() =>
+  getSeasonByMonth(selectedDate.value.getMonth() + 1)
+)
+const selectedWeatherRecord = ref<WeatherRecord | null>(null)
 
 const formattedWeek = computed(() => {
   const weekNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
@@ -41,16 +64,151 @@ const returnToAdmin = (): void => {
   router.push('/prediction')
 }
 
-const disableNonCurrentMonthDate = (date: Date): boolean =>
-  date.getFullYear() !== currentMonthDate.getFullYear() ||
-  date.getMonth() !== currentMonthDate.getMonth()
+const launchExternalApp = async (): Promise<void> => {
+  if (!externalAppSettings.value.path) {
+    ElMessage.warning('请先在系统设置中选择要跳转的软件')
+    return
+  }
 
-onMounted(() => {
-  selectedDate.value = new Date()
+  isExternalAppLaunching.value = true
+
+  try {
+    const result = await window.api.externalApp.launch()
+    externalAppSettings.value = result.settings
+
+    if (!result.success) {
+      ElMessage.error(result.error || '软件启动失败')
+    }
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '软件启动失败'))
+  } finally {
+    isExternalAppLaunching.value = false
+  }
+}
+
+const closeDatePicker = (): void => {
+  datePickerRef.value?.handleClose()
+  datePickerRef.value?.blur()
+
+  window.setTimeout(() => {
+    datePickerRef.value?.handleClose()
+    datePickerRef.value?.blur()
+  })
+}
+
+const handleDateChange = async (date: Date | null): Promise<void> => {
+  if (isDashboardDateWriting.value) {
+    pickerDate.value = cloneDate(selectedDate.value)
+    closeDatePicker()
+    return
+  }
+
+  if (!date || !isAllowedDashboardDate(date)) {
+    pickerDate.value = cloneDate(selectedDate.value)
+    closeDatePicker()
+    return
+  }
+
+  if (isSameDate(date, selectedDate.value)) {
+    pickerDate.value = cloneDate(selectedDate.value)
+    closeDatePicker()
+    return
+  }
+
+  closeDatePicker()
+
+  try {
+    await ElMessageBox.confirm(`是否确认查询 ${formatConfirmDate(date)} 的天气情况？`, '预测确认', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+
+    selectedDate.value = cloneDate(date)
+    pickerDate.value = cloneDate(date)
+    weatherPredictionToken.value += 1
+    closeDatePicker()
+
+    const dateCode = getDashboardDateCode(date)
+    isDashboardDateWriting.value = true
+
+    try {
+      const result = await window.api.plc.writeDashboardDate(dateCode)
+
+      if (!result.ok) {
+        ElMessage.error(result.error || result.statusText || '日期编码写入失败')
+      }
+    } catch (error) {
+      ElMessage.error(getErrorMessage(error, '日期编码写入失败'))
+    } finally {
+      isDashboardDateWriting.value = false
+    }
+  } catch {
+    pickerDate.value = cloneDate(selectedDate.value)
+    closeDatePicker()
+  }
+}
+
+const handleSelectedWeatherRecordChange = (record: WeatherRecord | null): void => {
+  selectedWeatherRecord.value = record
+}
+
+const isAllowedDashboardDate = (date: Date): boolean =>
+  allowedDashboardDates.some((allowedDate) => isSameDate(allowedDate, date))
+
+const isSameDate = (left: Date, right: Date): boolean =>
+  left.getFullYear() === right.getFullYear() &&
+  left.getMonth() === right.getMonth() &&
+  left.getDate() === right.getDate()
+
+const cloneDate = (date: Date): Date =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
+const formatConfirmDate = (date: Date): string => {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${date.getFullYear()}年${month}月${day}日`
+}
+
+const getSeasonByMonth = (month: number): WeatherSeason => {
+  if (month >= 6 && month <= 8) {
+    return '夏'
+  }
+
+  if (month === 12 || month <= 2) {
+    return '冬'
+  }
+
+  return '春秋'
+}
+
+const getDashboardDateCode = (date: Date): number => {
+  const codeByMonth: Record<number, number> = {
+    4: 1,
+    8: 2,
+    1: 3
+  }
+
+  return codeByMonth[date.getMonth() + 1]
+}
+
+const getErrorMessage = (error: unknown, fallback: string): string =>
+  error instanceof Error && error.message ? error.message : fallback
+
+onMounted(async () => {
+  selectedDate.value = new Date(dashboardYear, 3, 3)
+  pickerDate.value = new Date(dashboardYear, 3, 3)
   clockNow.value = new Date()
   clockTimer = window.setInterval(() => {
     clockNow.value = new Date()
   }, 1000)
+
+  try {
+    externalAppSettings.value = await window.api.externalApp.getSettings()
+  } catch {
+    externalAppSettings.value = { path: '', name: '' }
+  }
 })
 
 onBeforeUnmount(() => {
@@ -76,15 +234,16 @@ onBeforeUnmount(() => {
 
         <div class="topbar-side topbar-side--left">
           <el-date-picker
-            v-model="selectedDate"
+            ref="datePickerRef"
+            v-model="pickerDate"
             type="date"
             format="YYYY年MM月DD日"
             :clearable="false"
             :editable="false"
             :prefix-icon="Calendar"
-            :disabled-date="disableNonCurrentMonthDate"
             class="dashboard-date-picker app-no-drag"
             popper-class="dashboard-date-popper"
+            @change="handleDateChange"
           />
           <span class="whitespace-nowrap text-cyan-100/75">{{ formattedWeek }}</span>
           <span class="whitespace-nowrap font-semibold text-white">{{ formattedTime }}</span>
@@ -106,6 +265,25 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="topbar-side topbar-side--right">
+          <button
+            class="dashboard-back-button dashboard-app-button app-no-drag"
+            type="button"
+            :disabled="isExternalAppLaunching"
+            :title="
+              externalAppSettings.path
+                ? `打开 ${externalAppSettings.name}`
+                : '请先在系统设置中选择软件'
+            "
+            :aria-label="
+              externalAppSettings.path ? `打开${externalAppSettings.name}` : '打开外部软件'
+            "
+            @click="launchExternalApp"
+          >
+            <el-icon>
+              <Monitor />
+            </el-icon>
+            <span>{{ externalAppSettings.name || '打开软件' }}</span>
+          </button>
           <button class="dashboard-back-button app-no-drag" type="button" @click="returnToAdmin">
             <el-icon>
               <Back />
@@ -119,15 +297,23 @@ onBeforeUnmount(() => {
         class="app-no-drag mt-[0.8vh] grid min-h-0 flex-1 grid-cols-[27fr_46fr_27fr] gap-[0.8vw]"
       >
         <aside class="grid min-h-0 grid-rows-[45fr_55fr] gap-[0.8vh]">
-          <WeatherForecastPanel :selected-date="selectedDate" :start-day="selectedDay" />
-          <EnvironmentPanel :formatted-time="formattedTime" />
+          <WeatherForecastPanel
+            :season="selectedSeason"
+            :selected-day="selectedDay"
+            :prediction-token="weatherPredictionToken"
+            @selected-record-change="handleSelectedWeatherRecordChange"
+          />
+          <EnvironmentPanel
+            :formatted-time="formattedTime"
+            :selected-weather-record="selectedWeatherRecord"
+          />
         </aside>
 
         <MonitorPanels />
 
-        <aside class="grid min-h-0 grid-rows-[44fr_56fr] gap-[0.8vh]">
+        <aside class="grid min-h-0 grid-rows-[32fr_70fr] gap-[0.8vh]">
           <DeviceStatusPanel />
-          <EnergyPredictionPanel />
+          <EnergyPredictionPanel :selected-weather-record="selectedWeatherRecord" />
         </aside>
       </section>
     </div>
@@ -189,13 +375,21 @@ onBeforeUnmount(() => {
 .tech-panel {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(34, 211, 238, 0.48);
-  border-radius: 0.45rem;
+}
+
+.tech-panel {
+  --tech-corner: clamp(0.82rem, 0.9vw, 1.2rem);
+  isolation: isolate;
+  border: 0;
+  border-radius: 0.16rem;
   background:
-    linear-gradient(180deg, rgba(8, 47, 73, 0.52), rgba(2, 13, 31, 0.72)), rgba(2, 8, 23, 0.78);
+    linear-gradient(180deg, rgba(8, 47, 73, 0.64), rgba(2, 13, 31, 0.84)),
+    radial-gradient(circle at 12% 0%, rgba(34, 211, 238, 0.16), transparent 34%),
+    rgba(2, 8, 23, 0.88);
   box-shadow:
-    inset 0 0 1.2rem rgba(34, 211, 238, 0.12),
-    0 0 1.2rem rgba(14, 165, 233, 0.12);
+    inset 0 0 1.4rem rgba(34, 211, 238, 0.12),
+    inset 0 0 0.2rem rgba(125, 211, 252, 0.22),
+    0 0 1.25rem rgba(14, 165, 233, 0.18);
 }
 
 .dashboard-topbar {
@@ -220,9 +414,7 @@ onBeforeUnmount(() => {
 }
 
 .dashboard-topbar::before,
-.dashboard-topbar::after,
-.tech-panel::before,
-.tech-panel::after {
+.dashboard-topbar::after {
   position: absolute;
   z-index: 1;
   width: 3.2rem;
@@ -237,20 +429,104 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-.dashboard-topbar::before,
-.tech-panel::before {
+.dashboard-topbar::before {
   top: -1px;
   left: -1px;
   border-top: 2px solid;
   border-left: 2px solid;
 }
 
-.dashboard-topbar::after,
-.tech-panel::after {
+.dashboard-topbar::after {
   right: -1px;
   bottom: -1px;
   border-right: 2px solid;
   border-bottom: 2px solid;
+}
+
+.tech-panel::before,
+.tech-panel::after {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  content: '';
+}
+
+.tech-panel::before {
+  inset: 0;
+  box-sizing: border-box;
+  padding: 1px;
+  background:
+    linear-gradient(
+        135deg,
+        transparent 0 0.8rem,
+        rgba(34, 211, 238, 0.98) 0.82rem 1rem,
+        transparent 1.02rem
+      )
+      left top / 52% 52% no-repeat,
+    linear-gradient(
+        225deg,
+        transparent 0 0.8rem,
+        rgba(14, 165, 233, 0.95) 0.82rem 1rem,
+        transparent 1.02rem
+      )
+      right top / 52% 52% no-repeat,
+    linear-gradient(
+        315deg,
+        transparent 0 0.74rem,
+        rgba(34, 211, 238, 0.58) 0.76rem 0.92rem,
+        transparent 0.94rem
+      )
+      left bottom / 52% 52% no-repeat,
+    linear-gradient(
+        45deg,
+        transparent 0 0.74rem,
+        rgba(125, 211, 252, 0.62) 0.76rem 0.92rem,
+        transparent 0.94rem
+      )
+      right bottom / 52% 52% no-repeat,
+    linear-gradient(
+      90deg,
+      rgba(34, 211, 238, 0.9),
+      rgba(14, 165, 233, 0.34) 18%,
+      rgba(34, 211, 238, 0.16) 52%,
+      rgba(125, 211, 252, 0.72)
+    );
+  clip-path: polygon(
+    var(--tech-corner) 0,
+    calc(100% - var(--tech-corner)) 0,
+    100% var(--tech-corner),
+    100% 100%,
+    0 100%,
+    0 var(--tech-corner)
+  );
+  opacity: 0.96;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.tech-panel::after {
+  inset: clamp(0.28rem, 0.32vw, 0.46rem);
+  background:
+    linear-gradient(90deg, rgba(34, 211, 238, 0.52), transparent 74%) left top / 36% 1px no-repeat,
+    linear-gradient(180deg, rgba(34, 211, 238, 0.46), transparent 78%) left top / 1px 34% no-repeat,
+    linear-gradient(270deg, rgba(125, 211, 252, 0.54), transparent 74%) right top / 36% 1px
+      no-repeat,
+    linear-gradient(180deg, rgba(125, 211, 252, 0.42), transparent 78%) right top / 1px 34%
+      no-repeat,
+    linear-gradient(90deg, rgba(34, 211, 238, 0.16), transparent 44%, rgba(34, 211, 238, 0.2)) left
+      bottom / 100% 1px no-repeat;
+  clip-path: polygon(
+    calc(var(--tech-corner) * 0.62) 0,
+    calc(100% - var(--tech-corner) * 0.62) 0,
+    100% calc(var(--tech-corner) * 0.62),
+    100% 100%,
+    0 100%,
+    0 calc(var(--tech-corner) * 0.62)
+  );
+  opacity: 0.92;
 }
 
 .title-console {
@@ -356,8 +632,21 @@ onBeforeUnmount(() => {
   transform: translateY(0);
 }
 
+.dashboard-back-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+  transform: none;
+}
+
 .dashboard-back-button .el-icon {
   font-size: 1rem;
+}
+
+.dashboard-app-button span {
+  max-width: clamp(4.5rem, 7vw, 7.5rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-heading {
@@ -370,19 +659,43 @@ onBeforeUnmount(() => {
   gap: 0.55rem;
   padding: 0.55vh 0.8vw 0;
   border-bottom: 1px solid rgba(34, 211, 238, 0.16);
+  background:
+    linear-gradient(90deg, rgba(14, 165, 233, 0.12), rgba(2, 13, 31, 0) 72%),
+    linear-gradient(180deg, rgba(34, 211, 238, 0.1), rgba(2, 8, 23, 0));
+}
+
+.panel-heading > * {
+  position: relative;
+  z-index: 1;
+}
+
+.panel-heading::before {
+  position: absolute;
+  top: 50%;
+  right: clamp(0.82rem, 0.9vw, 1.25rem);
+  left: clamp(9rem, 44%, 18rem);
+  z-index: 0;
+  height: clamp(0.62rem, 0.72vh, 0.9rem);
+  content: '';
+  border-top: 1px solid rgba(34, 211, 238, 0.38);
+  border-right: 1px solid rgba(34, 211, 238, 0.26);
+  border-bottom: 1px solid rgba(14, 165, 233, 0.2);
+  opacity: 0.82;
+  transform: translateY(-46%) skewX(-32deg);
 }
 
 .panel-heading::after {
   position: absolute;
-  right: 0.8vw;
+  right: 0.95vw;
   bottom: -1px;
-  width: 34%;
+  width: 42%;
   height: 1px;
   content: '';
-  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.8), transparent);
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.86), transparent);
 }
 
 .panel-heading h2 {
+  position: relative;
   margin: 0;
   color: #22d3ee;
   font-size: 1.15rem;
@@ -391,16 +704,46 @@ onBeforeUnmount(() => {
   text-shadow: 0 0 0.75rem rgba(34, 211, 238, 0.7);
 }
 
+.panel-heading h2::after {
+  display: inline-block;
+  width: clamp(2.1rem, 2.4vw, 3.4rem);
+  height: clamp(0.26rem, 0.34vh, 0.36rem);
+  margin-left: clamp(0.78rem, 0.9vw, 1.1rem);
+  content: '';
+  vertical-align: 0.16rem;
+  background: linear-gradient(
+    90deg,
+    #0ea5e9 0 18%,
+    transparent 18% 31%,
+    #38bdf8 31% 49%,
+    transparent 49% 62%,
+    #7dd3fc 62% 80%,
+    transparent 80%
+  );
+  filter: drop-shadow(0 0 0.45rem rgba(56, 189, 248, 0.76));
+  transform: skewX(-22deg);
+}
+
 .panel-heading__icon {
+  position: relative;
   display: grid;
-  width: 1.7rem;
-  height: 1.7rem;
+  width: clamp(1.8rem, 1.9vw, 2.18rem);
+  height: clamp(1.8rem, 1.9vw, 2.18rem);
   place-items: center;
   border: 1px solid rgba(34, 211, 238, 0.7);
-  border-radius: 0.35rem;
-  color: #22d3ee;
-  background: rgba(8, 145, 178, 0.16);
-  box-shadow: inset 0 0 0.8rem rgba(34, 211, 238, 0.18);
+  border-radius: 0;
+  color: #67e8f9;
+  background:
+    linear-gradient(135deg, rgba(14, 165, 233, 0.34), rgba(2, 13, 31, 0.74)),
+    rgba(8, 145, 178, 0.18);
+  box-shadow:
+    inset 0 0 0.85rem rgba(34, 211, 238, 0.24),
+    0 0 0.7rem rgba(14, 165, 233, 0.28);
+  clip-path: polygon(25% 0, 75% 0, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0 75%, 0 25%);
+}
+
+.panel-heading__icon .el-icon {
+  filter: drop-shadow(0 0 0.4rem rgba(103, 232, 249, 0.8));
 }
 
 .environment-heading__icon {
@@ -535,6 +878,64 @@ onBeforeUnmount(() => {
   font-size: 0.84rem;
   line-height: 1.1;
   text-align: center;
+}
+
+.metric-tile--sun-range {
+  align-content: stretch;
+  gap: clamp(0.34rem, 0.56vh, 0.58rem);
+  padding: clamp(0.55rem, 0.82vh, 0.82rem) clamp(0.52rem, 0.72vw, 0.9rem);
+}
+
+.metric-tile--sun-range .metric-tile__top {
+  flex: 0 0 auto;
+}
+
+.sun-range {
+  display: grid;
+  width: min(100%, 10rem);
+  min-width: 0;
+  align-self: center;
+  gap: clamp(0.32rem, 0.52vh, 0.52rem);
+}
+
+.sun-range__item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.42rem;
+  padding: clamp(0.28rem, 0.45vh, 0.42rem) clamp(0.44rem, 0.58vw, 0.68rem);
+  border: 1px solid rgba(250, 204, 21, 0.2);
+  border-radius: 0.28rem;
+  background:
+    linear-gradient(90deg, rgba(250, 204, 21, 0.14), rgba(34, 211, 238, 0.06)), rgba(2, 8, 23, 0.36);
+}
+
+.sun-range__item--sunset {
+  border-color: rgba(125, 211, 252, 0.2);
+  background:
+    linear-gradient(90deg, rgba(14, 165, 233, 0.14), rgba(250, 204, 21, 0.05)), rgba(2, 8, 23, 0.36);
+}
+
+.metric-tile .sun-range__label {
+  flex: 0 0 auto;
+  color: rgba(203, 213, 225, 0.78);
+  font-size: clamp(0.68rem, 0.7vw, 0.8rem);
+  font-weight: 750;
+  line-height: 1;
+}
+
+.metric-tile .sun-range__time {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: clamp(0.94rem, 1.05vw, 1.26rem);
+  font-weight: 850;
+  line-height: 1;
+  text-align: right;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .monitor-frame {

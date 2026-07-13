@@ -32,3 +32,9 @@ $ npm run build:mac
 # For Linux
 $ npm run build:linux
 ```
+
+AI设备状态预测：
+
+AI能源预测：
+
+24小时预测用电量---夜间用电量增幅 白天平衡

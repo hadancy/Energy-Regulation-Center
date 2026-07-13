@@ -53,6 +53,21 @@ const api = {
     saveSettings: (settings: ExternalAppSettings): Promise<ExternalAppSettings> =>
       ipcRenderer.invoke('external-app:save-settings', settings),
     launch: (): Promise<ExternalAppActionResult> => ipcRenderer.invoke('external-app:launch')
+  },
+  window: {
+    getFullscreen: (): Promise<boolean> => ipcRenderer.invoke('window:get-fullscreen'),
+    toggleFullscreen: (): Promise<boolean> => ipcRenderer.invoke('window:toggle-fullscreen'),
+    onFullscreenChanged: (callback: (isFullscreen: boolean) => void) => {
+      const listener = (_event: IpcRendererEvent, isFullscreen: boolean): void => {
+        callback(isFullscreen)
+      }
+
+      ipcRenderer.on('window:fullscreen-changed', listener)
+
+      return () => {
+        ipcRenderer.removeListener('window:fullscreen-changed', listener)
+      }
+    }
   }
 }
 

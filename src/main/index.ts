@@ -36,6 +36,13 @@ function createWindow(): void {
     }
   })
 
+  const notifyFullscreenChanged = (): void => {
+    mainWindow.webContents.send('window:fullscreen-changed', mainWindow.isFullScreen())
+  }
+
+  mainWindow.on('enter-full-screen', notifyFullscreenChanged)
+  mainWindow.on('leave-full-screen', notifyFullscreenChanged)
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.maximize()
     mainWindow.show()
@@ -79,6 +86,19 @@ app.whenReady().then(async () => {
   registerWeatherIpc()
   registerPlcIpc()
   registerExternalAppIpc()
+
+  ipcMain.handle('window:get-fullscreen', (event) => {
+    return BrowserWindow.fromWebContents(event.sender)?.isFullScreen() ?? false
+  })
+  ipcMain.handle('window:toggle-fullscreen', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+
+    if (!window) return false
+
+    const nextFullscreen = !window.isFullScreen()
+    window.setFullScreen(nextFullscreen)
+    return nextFullscreen
+  })
 
   await startCameraProxy()
   createWindow()

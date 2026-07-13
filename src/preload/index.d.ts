@@ -272,6 +272,11 @@ export interface AppAPI {
     saveSettings: (settings: ExternalAppSettings) => Promise<ExternalAppSettings>
     launch: () => Promise<ExternalAppActionResult>
   }
+  window: {
+    getFullscreen: () => Promise<boolean>
+    toggleFullscreen: () => Promise<boolean>
+    onFullscreenChanged: (callback: (isFullscreen: boolean) => void) => () => void
+  }
 }
 
 declare global {

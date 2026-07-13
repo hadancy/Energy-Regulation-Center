@@ -5,7 +5,9 @@ import { useRouter } from 'vue-router'
 import {
   Back,
   Calendar,
-  Monitor
+  FullScreen,
+  Monitor,
+  ScaleToOriginal
   // PartlyCloudy
 } from '@element-plus/icons-vue'
 import dashboardTopFrame from '@renderer/assets/dashboard-top-frame.svg'
@@ -33,8 +35,10 @@ const clockNow = ref(new Date())
 const isDashboardDateWriting = ref(false)
 const externalAppSettings = ref({ path: '', name: '' })
 const isExternalAppLaunching = ref(false)
+const isFullscreen = ref(false)
 
 let clockTimer: number | null = null
+let unsubscribeFullscreenChanged: (() => void) | null = null
 
 type WeatherSeason = Parameters<typeof window.api.weather.forecast>[0]['season']
 type WeatherRecord = Awaited<ReturnType<typeof window.api.weather.forecast>>[number]
@@ -62,6 +66,14 @@ const formattedTime = computed(() => {
 
 const returnToAdmin = (): void => {
   router.push('/prediction')
+}
+
+const toggleFullscreen = async (): Promise<void> => {
+  try {
+    isFullscreen.value = await window.api.window.toggleFullscreen()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '全屏切换失败'))
+  }
 }
 
 const launchExternalApp = async (): Promise<void> => {
@@ -204,6 +216,16 @@ onMounted(async () => {
     clockNow.value = new Date()
   }, 1000)
 
+  unsubscribeFullscreenChanged = window.api.window.onFullscreenChanged((fullscreen) => {
+    isFullscreen.value = fullscreen
+  })
+
+  try {
+    isFullscreen.value = await window.api.window.getFullscreen()
+  } catch {
+    isFullscreen.value = false
+  }
+
   try {
     externalAppSettings.value = await window.api.externalApp.getSettings()
   } catch {
@@ -216,6 +238,9 @@ onBeforeUnmount(() => {
     window.clearInterval(clockTimer)
     clockTimer = null
   }
+
+  unsubscribeFullscreenChanged?.()
+  unsubscribeFullscreenChanged = null
 })
 </script>
 
@@ -289,6 +314,18 @@ onBeforeUnmount(() => {
               <Back />
             </el-icon>
             <span>返回后台</span>
+          </button>
+          <button
+            class="dashboard-back-button dashboard-fullscreen-button app-no-drag"
+            type="button"
+            :title="isFullscreen ? '取消全屏' : '全屏'"
+            :aria-label="isFullscreen ? '取消全屏' : '全屏'"
+            @click="toggleFullscreen"
+          >
+            <el-icon>
+              <ScaleToOriginal v-if="isFullscreen" />
+              <FullScreen v-else />
+            </el-icon>
           </button>
         </div>
       </header>
@@ -640,6 +677,15 @@ onBeforeUnmount(() => {
 
 .dashboard-back-button .el-icon {
   font-size: 1rem;
+}
+
+.dashboard-fullscreen-button {
+  width: clamp(2rem, 3.5vh, 2.55rem);
+  padding: 0;
+}
+
+.dashboard-fullscreen-button .el-icon {
+  font-size: 1.12rem;
 }
 
 .dashboard-app-button span {

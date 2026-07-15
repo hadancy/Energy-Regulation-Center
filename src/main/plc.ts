@@ -50,6 +50,7 @@ const DEFAULT_TIMEOUT_MS = Number.isFinite(PLC_TIMEOUT_MS) ? PLC_TIMEOUT_MS : 30
 const PLC_VISIBLE_ERROR_FAILURES = 3
 const MODBUS_CONNECT_MAX_ATTEMPTS = 3
 const MODBUS_CONNECT_RETRY_DELAY_MS = 250
+const MODBUS_RECONNECT_GAP_MS = 500
 
 type PlcConnectionStatus = 'idle' | 'connecting' | 'connected' | 'partial' | 'error'
 type PlcPointStatus = 'success' | 'error' | 'skipped'
@@ -825,7 +826,11 @@ const closeModbusClient = async (activeClient: ModbusRTU | null): Promise<void> 
 
     console.info(`[PLC] Modbus TCP 连接已关闭：${Date.now() - closeStartedAt}ms`)
   } finally {
-    releaseConnection?.()
+    if (releaseConnection) {
+      await delay(MODBUS_RECONNECT_GAP_MS)
+      console.info(`[PLC] Modbus TCP 重连冷却完成：${MODBUS_RECONNECT_GAP_MS}ms`)
+      releaseConnection()
+    }
   }
 }
 
@@ -1320,7 +1325,7 @@ const createDashboardDateWritePoint = (input: unknown): PlcWritePoint => {
   return createWeatherWritePoint({
     id: 'dashboardDate',
     name: '仪表盘日期',
-    registerArea: 'MD',
+    registerArea: 'MW',
     offsetAddress: 620,
     dataType: 'uint16',
     scale: 1,

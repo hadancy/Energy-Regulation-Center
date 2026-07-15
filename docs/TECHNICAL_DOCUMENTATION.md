@@ -381,7 +381,7 @@ PLC_HOST=192.168.0.10 PLC_PORT=502 npm run dev
 | `SunriseTime` | 日出时间 | MD610 | int32 | 当日零点起毫秒数 |
 | `SunsetTime` | 日落时间 | MD614 | int32 | 当日零点起毫秒数 |
 | `traffic` | 车流量 | MW618 | uint16 | 0～65535 整数 |
-| `dashboardDate` | 仪表盘日期编码 | MD620 | uint16 | 0 / 1 / 2 |
+| `dashboardDate` | 仪表盘日期编码 | MW620 | uint16 | 0 / 1 / 2 |
 
 Modbus 模式下，M/I/Q/DB 等字节寻址区使用以下映射：
 
@@ -392,6 +392,8 @@ Modbus 寄存器地址 = (点位字节地址 - PLC_MODBUS_MEMORY_BASE_ADDRESS) /
 因此地址必须不小于映射基址且为偶数。默认基址为 500，例如 MW600 映射到保持寄存器 50。
 
 ### 9.5 轮询与错误处理
+
+Modbus TCP 连接关闭后会等待 500ms 再释放全局连接队列，避免 PLC 尚未释放上一条会话时立即重连导致请求超时。
 
 - 第一个使用 `startPolling()` 的页面启动全局轮询；重复启动不会创建多个定时器；
 - 读写、连接测试和轮询之间有互斥控制，避免同一时间并发占用连接；

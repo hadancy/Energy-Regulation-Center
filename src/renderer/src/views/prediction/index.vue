@@ -31,7 +31,6 @@ type WeatherPlcPointName =
   | 'Humidity'
   | 'SunriseTime'
   | 'SunsetTime'
-  | 'Season'
 
 interface WeatherPlcPointPreview {
   name: WeatherPlcPointName
@@ -57,11 +56,6 @@ const weatherPlcCodeByName: Record<string, number> = {
   雪: 4,
   暴雪: 5
 }
-const seasonPlcCodeByName: Record<WeatherSeason, number> = {
-  春秋: 0,
-  夏: 1,
-  冬: 2
-}
 const weatherPlcPointDefinitions: Array<
   Pick<WeatherPlcPointPreview, 'name' | 'address' | 'dataType' | 'comment'>
 > = [
@@ -76,8 +70,7 @@ const weatherPlcPointDefinitions: Array<
   { name: 'Temperature', address: '%MW606', dataType: 'Word', comment: '温度' },
   { name: 'Humidity', address: '%MW608', dataType: 'Word', comment: '湿度' },
   { name: 'SunriseTime', address: '%MD610', dataType: 'Time', comment: '日出时间' },
-  { name: 'SunsetTime', address: '%MD614', dataType: 'Time', comment: '日落时间' },
-  { name: 'Season', address: '%MW620', dataType: 'Word', comment: '季节状态' }
+  { name: 'SunsetTime', address: '%MD614', dataType: 'Time', comment: '日落时间' }
 ]
 
 const loading = ref(false)
@@ -470,8 +463,7 @@ function createWeatherPlcPreview(
     Temperature: savedRecord.temperature,
     Humidity: savedRecord.humidity,
     SunriseTime: timeToPlcTimeLiteral(savedRecord.sunrise),
-    SunsetTime: timeToPlcTimeLiteral(savedRecord.sunset),
-    Season: seasonPlcCodeByName[savedRecord.season]
+    SunsetTime: timeToPlcTimeLiteral(savedRecord.sunset)
   }
   const sourceValues: Record<WeatherPlcPointName, number | string> = {
     DateIndex1: savedRecord.date,
@@ -480,8 +472,7 @@ function createWeatherPlcPreview(
     Temperature: savedRecord.temperature,
     Humidity: savedRecord.humidity,
     SunriseTime: savedRecord.sunrise,
-    SunsetTime: savedRecord.sunset,
-    Season: savedRecord.season
+    SunsetTime: savedRecord.sunset
   }
   const notes: Record<WeatherPlcPointName, string> = {
     DateIndex1:
@@ -496,8 +487,7 @@ function createWeatherPlcPreview(
     Temperature: '保存值，写入 PLC 时按 0.1 缩放为有符号整数',
     Humidity: '保存值，写入 PLC 时按 0.1 缩放为整数',
     SunriseTime: 'HH:mm 转为 PLC Time 字面量，例如 T#7h40m',
-    SunsetTime: 'HH:mm 转为 PLC Time 字面量，例如 T#17h41m',
-    Season: '春秋=0，夏=1，冬=2'
+    SunsetTime: 'HH:mm 转为 PLC Time 字面量，例如 T#17h41m'
   }
   const points: WeatherPlcPointPreview[] = weatherPlcPointDefinitions.map((definition) => ({
     ...definition,
@@ -528,8 +518,7 @@ function createWeatherPlcWriteInput(
     temperature: savedRecord.temperature,
     humidity: savedRecord.humidity,
     sunrise: savedRecord.sunrise,
-    sunset: savedRecord.sunset,
-    seasonCode: getRequiredPlcNumber(preview.values.Season, `季节“${savedRecord.season}”编码`)
+    sunset: savedRecord.sunset
   }
 }
 

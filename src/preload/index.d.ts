@@ -138,6 +138,14 @@ export interface PlcTestInput {
   points?: PlcReadPoint[]
 }
 
+export interface PlcConfigurationInput {
+  host: string
+  port: number
+  unitId: number
+  timeoutMs: number
+  points: PlcReadPoint[]
+}
+
 export interface PlcTestResult {
   ok: boolean
   protocol: string
@@ -161,7 +169,6 @@ export interface PlcWeatherWriteInput {
   humidity: number
   sunrise: string
   sunset: string
-  seasonCode: number
 }
 
 export interface PlcWritePointResult {
@@ -213,6 +220,7 @@ export interface ExternalAppActionResult {
   success: boolean
   settings: ExternalAppSettings
   error: string
+  action?: 'launched' | 'activated' | 'already-running'
 }
 
 export interface PlcState {
@@ -248,6 +256,8 @@ export interface AppAPI {
     startPolling: () => Promise<PlcState>
     stopPolling: () => Promise<PlcState>
     updatePoints: (points: PlcReadPoint[]) => Promise<PlcState>
+    saveConfig: (input: PlcConfigurationInput) => Promise<PlcState>
+    resetConfig: () => Promise<PlcState>
     testConnection: (input: PlcTestInput) => Promise<PlcTestResult>
     writeWeather: (input: PlcWeatherWriteInput) => Promise<PlcWeatherWriteResult>
     writeTraffic: (value: number) => Promise<PlcTrafficWriteResult>

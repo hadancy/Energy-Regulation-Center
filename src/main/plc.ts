@@ -1,6 +1,11 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import { Socket } from 'net'
 import ModbusRTU from 'modbus-serial'
+import {
+  getAppMetadataValue,
+  removeAppMetadataValue,
+  setAppMetadataValue
+} from './database/weatherRepository'
 
 const PLC_PROTOCOL = process.env['PLC_PROTOCOL'] ?? 'Modbus TCP'
 const PLC_BRAND = process.env['PLC_BRAND'] ?? '西门子'
@@ -19,9 +24,11 @@ const PLC_MODBUS_MEMORY_BASE_ADDRESS = Number.parseInt(
   process.env['PLC_MODBUS_MEMORY_BASE_ADDRESS'] ?? '500',
   10
 )
-const PLC_POLL_INTERVAL_MS = Number.parseInt(process.env['PLC_POLL_INTERVAL_MS'] ?? '1000', 10)
+const PLC_POLL_INTERVAL_MS = Number.parseInt(process.env['PLC_POLL_INTERVAL_MS'] ?? '3000', 10)
 const PLC_TIMEOUT_MS = Number.parseInt(process.env['PLC_TIMEOUT_MS'] ?? '3000', 10)
 const PLC_READ_POINTS_JSON = process.env['PLC_READ_POINTS'] ?? ''
+const PLC_CONFIGURATION_KEY = 'plc_configuration_v1'
+const PLC_CONFIGURATION_VERSION = 1
 
 const DEFAULT_PORT = Number.isFinite(PLC_PORT)
   ? PLC_PORT
@@ -38,7 +45,7 @@ const DEFAULT_ILLUMINANCE_ADDRESS = Number.isFinite(PLC_ILLUMINANCE_ADDRESS)
 const DEFAULT_MODBUS_MEMORY_BASE_ADDRESS = Number.isFinite(PLC_MODBUS_MEMORY_BASE_ADDRESS)
   ? PLC_MODBUS_MEMORY_BASE_ADDRESS
   : DEFAULT_START_ADDRESS
-const DEFAULT_POLL_INTERVAL_MS = Number.isFinite(PLC_POLL_INTERVAL_MS) ? PLC_POLL_INTERVAL_MS : 1000
+const DEFAULT_POLL_INTERVAL_MS = Number.isFinite(PLC_POLL_INTERVAL_MS) ? PLC_POLL_INTERVAL_MS : 3000
 const DEFAULT_TIMEOUT_MS = Number.isFinite(PLC_TIMEOUT_MS) ? PLC_TIMEOUT_MS : 3000
 const PLC_VISIBLE_ERROR_FAILURES = 3
 const MODBUS_CONNECT_MAX_ATTEMPTS = 3
@@ -95,6 +102,16 @@ interface PlcConnectionConfig {
   timeoutMs: number
 }
 
+export interface PlcConfigurationInput extends PlcConnectionConfig {
+  points: unknown
+}
+
+interface PersistedPlcConfiguration extends PlcConnectionConfig {
+  version: typeof PLC_CONFIGURATION_VERSION
+  points: PlcReadPoint[]
+  updatedAt: string
+}
+
 export interface PlcTestInput extends Partial<PlcConnectionConfig> {
   points?: unknown
 }
@@ -118,7 +135,6 @@ export interface PlcWeatherWriteInput {
   humidity: number
   sunrise: string
   sunset: string
-  seasonCode: number
 }
 
 type PlcWriteStatus = 'success' | 'error'
@@ -851,6 +867,43 @@ const normalizeConnectionConfig = (input?: Partial<PlcConnectionConfig>): PlcCon
   timeoutMs: toPositiveInteger(input?.timeoutMs, state.timeoutMs)
 })
 
+const validateConfigurationInput = (
+  input: unknown
+): { config: PlcConnectionConfig; points: PlcReadPoint[] } => {
+  const candidate =
+    input && typeof input === 'object' ? (input as Partial<PlcConfigurationInput>) : {}
+  const host = typeof candidate.host === 'string' ? candidate.host.trim() : ''
+  const port = Number(candidate.port)
+  const unitId = Number(candidate.unitId)
+  const timeoutMs = Number(candidate.timeoutMs)
+  const points = sanitizeReadPoints(candidate.points)
+
+  if (!host) {
+    throw new Error('PLC IP 不能为空。')
+  }
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('PLC 端口必须是 1 到 65535 之间的整数。')
+  }
+
+  if (!Number.isInteger(unitId) || unitId < 1 || unitId > 255) {
+    throw new Error('PLC 站号必须是 1 到 255 之间的整数。')
+  }
+
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 200) {
+    throw new Error('PLC 超时时间必须是大于或等于 200ms 的整数。')
+  }
+
+  if (points.filter((point) => point.enabled).length === 0) {
+    throw new Error('请至少保留一个启用的 PLC 点位。')
+  }
+
+  return {
+    config: { host, port, unitId, timeoutMs },
+    points
+  }
+}
+
 const getPlcConnectionText = (config: PlcConnectionConfig): string => {
   return `${config.host}:${config.port} unit=${config.unitId} timeout=${config.timeoutMs}ms`
 }
@@ -1143,7 +1196,6 @@ const createWeatherWritePoints = (input: PlcWeatherWriteInput): PlcWritePoint[] 
   const humidity = getFiniteWriteNumber(input.humidity, '湿度')
   const sunriseMs = parsePlcTimeMilliseconds(input.sunrise, '日出时间')
   const sunsetMs = parsePlcTimeMilliseconds(input.sunset, '日落时间')
-  const seasonCode = getIntegerWriteNumber(input.seasonCode, '季节状态')
 
   return [
     createWeatherWritePoint({
@@ -1236,19 +1288,6 @@ const createWeatherWritePoints = (input: PlcWeatherWriteInput): PlcWritePoint[] 
       displayValue: formatPlcTimeLiteral(sunsetMs),
       rawValue: sunsetMs,
       valueKind: 'time'
-    }),
-    createWeatherWritePoint({
-      id: 'Season',
-      name: '季节状态',
-      registerArea: 'MW',
-      offsetAddress: 620,
-      dataType: 'uint16',
-      scale: 1,
-      unit: '',
-      sourceValue: seasonCode,
-      displayValue: seasonCode,
-      rawValue: seasonCode,
-      valueKind: 'number'
     })
   ]
 }
@@ -2016,18 +2055,21 @@ const readPlcOnce = async (): Promise<void> => {
   }
 }
 
-const updatePlcPoints = (points: unknown): PlcState => {
-  const nextPoints = sanitizeReadPoints(points)
-
-  if (nextPoints.filter((point) => point.enabled).length === 0) {
-    throw new Error('请至少保留一个启用的 PLC 点位。')
-  }
-
+const applyPlcConfiguration = (
+  config: PlcConnectionConfig,
+  nextPoints: PlcReadPoint[]
+): PlcState => {
   updateState({
+    ...config,
     points: nextPoints,
+    status: 'idle',
+    statusText: '等待连接',
     readings: [],
     values: emptyValues(),
+    lastUpdatedAt: '',
+    lastUpdatedTimestamp: 0,
     error: '',
+    consecutiveFailures: 0,
     ...deriveLegacyAddressState(nextPoints)
   })
 
@@ -2036,6 +2078,58 @@ const updatePlcPoints = (points: unknown): PlcState => {
   }
 
   return getPlcState()
+}
+
+const savePlcConfiguration = (input: PlcConfigurationInput): PlcState => {
+  const { config, points } = validateConfigurationInput(input)
+  const persistedConfiguration: PersistedPlcConfiguration = {
+    version: PLC_CONFIGURATION_VERSION,
+    ...config,
+    points: points.map(clonePoint),
+    updatedAt: new Date().toISOString()
+  }
+
+  setAppMetadataValue(PLC_CONFIGURATION_KEY, JSON.stringify(persistedConfiguration))
+  return applyPlcConfiguration(config, points)
+}
+
+const updatePlcPoints = (points: unknown): PlcState => {
+  return savePlcConfiguration({ ...getCurrentConnectionConfig(), points })
+}
+
+const loadPersistedPlcConfiguration = (): void => {
+  try {
+    const storedValue = getAppMetadataValue(PLC_CONFIGURATION_KEY)
+
+    if (!storedValue) {
+      return
+    }
+
+    const parsed = JSON.parse(storedValue) as Partial<PersistedPlcConfiguration>
+
+    if (parsed.version !== PLC_CONFIGURATION_VERSION) {
+      throw new Error(`不支持的配置版本：${String(parsed.version ?? '')}`)
+    }
+
+    const { config, points } = validateConfigurationInput(parsed)
+    applyPlcConfiguration(config, points)
+  } catch (error) {
+    console.error(`[PLC] 持久化配置加载失败：${getRawErrorMessage(error)}`)
+  }
+}
+
+const resetPlcConfiguration = (): PlcState => {
+  const defaults: PlcConfigurationInput = {
+    host: toText(PLC_HOST, '192.168.0.1'),
+    port: DEFAULT_PORT,
+    unitId: DEFAULT_UNIT_ID,
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+    points: createDefaultReadPoints()
+  }
+  const { config, points } = validateConfigurationInput(defaults)
+
+  removeAppMetadataValue(PLC_CONFIGURATION_KEY)
+  return applyPlcConfiguration(config, points)
 }
 
 const testPlcConnection = async (input: PlcTestInput = {}): Promise<PlcTestResult> => {
@@ -2296,6 +2390,7 @@ export const stopPlcPolling = (): void => {
 }
 
 export const registerPlcIpc = (): void => {
+  loadPersistedPlcConfiguration()
   ipcMain.handle('plc:get-state', () => getPlcState())
   ipcMain.handle('plc:start-polling', () => {
     startPlcPolling()
@@ -2306,6 +2401,10 @@ export const registerPlcIpc = (): void => {
     return getPlcState()
   })
   ipcMain.handle('plc:update-points', (_event, points: unknown) => updatePlcPoints(points))
+  ipcMain.handle('plc:save-config', (_event, input: PlcConfigurationInput) =>
+    savePlcConfiguration(input)
+  )
+  ipcMain.handle('plc:reset-config', () => resetPlcConfiguration())
   ipcMain.handle('plc:test-connection', (_event, input?: PlcTestInput) => testPlcConnection(input))
   ipcMain.handle('plc:write-weather', (_event, input: PlcWeatherWriteInput) =>
     writeWeatherToPlc(input)

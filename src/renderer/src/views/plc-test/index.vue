@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   CircleCheck,
   Connection,
@@ -8,6 +8,7 @@ import {
   DocumentChecked,
   Plus,
   Refresh,
+  RefreshLeft,
   Warning
 } from '@element-plus/icons-vue'
 
@@ -53,6 +54,7 @@ const registerAreaOptions = ['MW', 'DB', 'M', 'I', 'Q', 'D', 'R', 'W']
 const loading = ref(false)
 const testing = ref(false)
 const applying = ref(false)
+const resetting = ref(false)
 const currentState = ref<PlcState | null>(null)
 const testResult = ref<PlcTestResult | null>(null)
 const rows = ref<PlcPointForm[]>([])
@@ -138,12 +140,7 @@ async function loadState(): Promise<void> {
 
   try {
     const state = await window.api.plc.getState()
-    currentState.value = state
-    connectionForm.host = state.host
-    connectionForm.port = state.port
-    connectionForm.unitId = state.unitId
-    connectionForm.timeoutMs = state.timeoutMs
-    rows.value = state.points.map(toPointRow)
+    applyStateToForm(state)
 
     if (rows.value.length === 0) {
       addPoint()
@@ -153,6 +150,15 @@ async function loadState(): Promise<void> {
   } finally {
     loading.value = false
   }
+}
+
+function applyStateToForm(state: PlcState): void {
+  currentState.value = state
+  connectionForm.host = state.host
+  connectionForm.port = state.port
+  connectionForm.unitId = state.unitId
+  connectionForm.timeoutMs = state.timeoutMs
+  rows.value = state.points.map(toPointRow)
 }
 
 function toPointRow(point: PlcReadPoint): PlcPointForm {
@@ -193,7 +199,7 @@ function removePoint(row: PlcPointForm): void {
 }
 
 async function testConnection(): Promise<void> {
-  if (!validateRows()) {
+  if (!validateConfiguration()) {
     return
   }
 
@@ -219,23 +225,82 @@ async function testConnection(): Promise<void> {
   }
 }
 
-async function applyPoints(): Promise<void> {
-  if (!validateRows()) {
+async function saveConfiguration(): Promise<void> {
+  if (!validateConfiguration()) {
     return
   }
 
   applying.value = true
 
   try {
-    const state = await window.api.plc.updatePoints(getApiPoints())
-    currentState.value = state
-    rows.value = state.points.map(toPointRow)
-    ElMessage.success('PLC点位已应用')
+    const state = await window.api.plc.saveConfig({
+      ...getConnectionPayload(),
+      points: getApiPoints()
+    })
+    applyStateToForm(state)
+    ElMessage.success('PLC配置已保存并应用')
   } catch (error) {
-    ElMessage.error(getErrorMessage(error, 'PLC点位应用失败'))
+    ElMessage.error(getErrorMessage(error, 'PLC配置保存失败'))
   } finally {
     applying.value = false
   }
+}
+
+async function resetConfiguration(): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      '将删除已保存的 PLC 连接参数和点位，并恢复环境变量或内置默认值。是否继续？',
+      '恢复默认配置',
+      {
+        confirmButtonText: '恢复默认',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return
+  }
+
+  resetting.value = true
+
+  try {
+    const state = await window.api.plc.resetConfig()
+    applyStateToForm(state)
+    testResult.value = null
+    ElMessage.success('PLC配置已恢复默认')
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, 'PLC配置恢复失败'))
+  } finally {
+    resetting.value = false
+  }
+}
+
+function validateConfiguration(): boolean {
+  if (!connectionForm.host.trim()) {
+    ElMessage.warning('请输入 PLC IP')
+    return false
+  }
+
+  const port = Number(connectionForm.port)
+  const unitId = Number(connectionForm.unitId)
+  const timeoutMs = Number(connectionForm.timeoutMs)
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    ElMessage.warning('PLC 端口必须是 1 到 65535 之间的整数')
+    return false
+  }
+
+  if (!Number.isInteger(unitId) || unitId < 1 || unitId > 255) {
+    ElMessage.warning('PLC 站号必须是 1 到 255 之间的整数')
+    return false
+  }
+
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 200) {
+    ElMessage.warning('PLC 超时时间必须是大于或等于 200ms 的整数')
+    return false
+  }
+
+  return validateRows()
 }
 
 function validateRows(): boolean {
@@ -392,7 +457,12 @@ function getErrorMessage(error: unknown, fallback: string): string {
               <p class="plc-eyebrow">Connection</p>
               <h2 class="plc-panel-title">连接参数</h2>
             </div>
-            <el-button :icon="Refresh" :loading="loading" @click="loadState">刷新</el-button>
+            <div class="plc-toolbar">
+              <el-button :icon="RefreshLeft" :loading="resetting" @click="resetConfiguration">
+                恢复默认
+              </el-button>
+              <el-button :icon="Refresh" :loading="loading" @click="loadState">刷新</el-button>
+            </div>
           </div>
         </template>
 
@@ -405,38 +475,43 @@ function getErrorMessage(error: unknown, fallback: string): string {
             </div>
           </div>
 
-          <el-form label-position="top" class="plc-config-grid">
-            <el-form-item label="PLC IP">
-              <el-input v-model="connectionForm.host" placeholder="192.168.0.1" />
-            </el-form-item>
-            <el-form-item label="端口">
-              <el-input-number
-                v-model="connectionForm.port"
-                :min="1"
-                :step="1"
-                controls-position="right"
-                class="w-full!"
-              />
-            </el-form-item>
-            <el-form-item label="站号">
-              <el-input-number
-                v-model="connectionForm.unitId"
-                :min="1"
-                :step="1"
-                controls-position="right"
-                class="w-full!"
-              />
-            </el-form-item>
-            <el-form-item label="超时">
-              <el-input-number
-                v-model="connectionForm.timeoutMs"
-                :min="200"
-                :step="100"
-                controls-position="right"
-                class="w-full!"
-              />
-            </el-form-item>
-          </el-form>
+          <div class="plc-config-editor">
+            <el-form label-position="top" class="plc-config-grid">
+              <el-form-item label="PLC IP">
+                <el-input v-model="connectionForm.host" placeholder="192.168.0.1" />
+              </el-form-item>
+              <el-form-item label="端口">
+                <el-input-number
+                  v-model="connectionForm.port"
+                  :min="1"
+                  :max="65535"
+                  :step="1"
+                  controls-position="right"
+                  class="w-full!"
+                />
+              </el-form-item>
+              <el-form-item label="站号">
+                <el-input-number
+                  v-model="connectionForm.unitId"
+                  :min="1"
+                  :max="255"
+                  :step="1"
+                  controls-position="right"
+                  class="w-full!"
+                />
+              </el-form-item>
+              <el-form-item label="超时">
+                <el-input-number
+                  v-model="connectionForm.timeoutMs"
+                  :min="200"
+                  :step="100"
+                  controls-position="right"
+                  class="w-full!"
+                />
+              </el-form-item>
+            </el-form>
+            <p class="plc-config-note">测试读取不会保存参数；点击“保存并应用”后重启仍然生效。</p>
+          </div>
         </div>
       </el-card>
 
@@ -485,8 +560,8 @@ function getErrorMessage(error: unknown, fallback: string): string {
             <el-button type="primary" :icon="Connection" :loading="testing" @click="testConnection">
               测试读取
             </el-button>
-            <el-button :icon="DocumentChecked" :loading="applying" @click="applyPoints">
-              应用点位
+            <el-button :icon="DocumentChecked" :loading="applying" @click="saveConfiguration">
+              保存并应用
             </el-button>
           </div>
         </div>
@@ -746,7 +821,18 @@ function getErrorMessage(error: unknown, fallback: string): string {
   align-content: center;
   gap: 14px;
   grid-template-columns: repeat(4, minmax(130px, 1fr));
-  padding: 22px 20px;
+}
+
+.plc-config-editor {
+  align-self: center;
+  padding: 18px 20px;
+}
+
+.plc-config-note {
+  margin: 10px 0 0;
+  color: #7c8a9e;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .plc-config-grid :deep(.el-form-item) {

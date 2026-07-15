@@ -14,6 +14,9 @@ const api = {
     stopPolling: (): Promise<PlcState> => ipcRenderer.invoke('plc:stop-polling'),
     updatePoints: (points: PlcReadPoint[]): Promise<PlcState> =>
       ipcRenderer.invoke('plc:update-points', points),
+    saveConfig: (input: PlcConfigurationInput): Promise<PlcState> =>
+      ipcRenderer.invoke('plc:save-config', input),
+    resetConfig: (): Promise<PlcState> => ipcRenderer.invoke('plc:reset-config'),
     testConnection: (input: PlcTestInput): Promise<PlcTestResult> =>
       ipcRenderer.invoke('plc:test-connection', input),
     writeWeather: (input: PlcWeatherWriteInput): Promise<PlcWeatherWriteResult> =>
@@ -80,6 +83,7 @@ interface ExternalAppActionResult {
   success: boolean
   settings: ExternalAppSettings
   error: string
+  action?: 'launched' | 'activated' | 'already-running'
 }
 
 interface WeatherRecordInput {
@@ -161,6 +165,14 @@ interface PlcTestInput {
   points?: PlcReadPoint[]
 }
 
+interface PlcConfigurationInput {
+  host: string
+  port: number
+  unitId: number
+  timeoutMs: number
+  points: PlcReadPoint[]
+}
+
 interface PlcTestResult {
   ok: boolean
   protocol: string
@@ -184,7 +196,6 @@ interface PlcWeatherWriteInput {
   humidity: number
   sunrise: string
   sunset: string
-  seasonCode: number
 }
 
 interface PlcWritePointResult {

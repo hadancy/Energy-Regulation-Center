@@ -96,6 +96,10 @@ const launchExternalApp = async (): Promise<void> => {
 
     if (!result.success) {
       ElMessage.error(result.error || '软件启动失败')
+    } else if (result.action === 'activated') {
+      ElMessage.success(`已切换到${result.settings.name}`)
+    } else if (result.action === 'already-running') {
+      ElMessage.warning(`${result.settings.name}已在运行，但未找到可切换的窗口`)
     }
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '软件启动失败'))

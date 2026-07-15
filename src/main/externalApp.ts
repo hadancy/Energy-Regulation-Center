@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { execFile } from 'child_process'
 import { basename, extname, join } from 'path'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 
@@ -11,7 +12,128 @@ export interface ExternalAppActionResult {
   success: boolean
   settings: ExternalAppSettings
   error: string
+  action?: 'launched' | 'activated' | 'already-running'
 }
+
+type WindowsActivationResult = 'not-running' | 'activated' | 'already-running' | 'unsupported'
+
+const WINDOWS_ACTIVATE_SCRIPT = String.raw`
+$ErrorActionPreference = 'Stop'
+$targetPath = [IO.Path]::GetFullPath($env:ENERGY_EXTERNAL_APP_PATH)
+
+if ([IO.Path]::GetExtension($targetPath) -ieq '.lnk') {
+  $shell = New-Object -ComObject WScript.Shell
+  $shortcut = $shell.CreateShortcut($targetPath)
+  if ($shortcut.TargetPath) {
+    $targetPath = [IO.Path]::GetFullPath($shortcut.TargetPath)
+  }
+}
+
+if ([IO.Path]::GetExtension($targetPath) -ine '.exe') {
+  [Console]::Out.Write('UNSUPPORTED')
+  exit 0
+}
+
+$processes = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+  try {
+    $_.Path -and [string]::Equals(
+      [IO.Path]::GetFullPath($_.Path),
+      $targetPath,
+      [StringComparison]::OrdinalIgnoreCase
+    )
+  } catch {
+    $false
+  }
+})
+
+if ($processes.Count -eq 0) {
+  [Console]::Out.Write('NOT_RUNNING')
+  exit 0
+}
+
+$windowProcess = $processes | Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+
+if (-not $windowProcess) {
+  [Console]::Out.Write('ALREADY_RUNNING')
+  exit 0
+}
+
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class ExternalWindowActivator
+{
+    [DllImport("user32.dll")]
+    public static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    public static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+}
+'@
+
+$handle = $windowProcess.MainWindowHandle
+$showCommand = if ([ExternalWindowActivator]::IsIconic($handle)) { 9 } else { 5 }
+[ExternalWindowActivator]::ShowWindowAsync($handle, $showCommand) | Out-Null
+
+$automation = New-Object -ComObject WScript.Shell
+$activatedByShell = $automation.AppActivate($windowProcess.Id)
+[ExternalWindowActivator]::BringWindowToTop($handle) | Out-Null
+$activatedByApi = [ExternalWindowActivator]::SetForegroundWindow($handle)
+
+if ($activatedByShell -or $activatedByApi) {
+  [Console]::Out.Write('ACTIVATED')
+} else {
+  [Console]::Out.Write('ALREADY_RUNNING')
+}
+`
+
+const activateRunningWindowsApp = (filePath: string): Promise<WindowsActivationResult> =>
+  new Promise((resolve) => {
+    execFile(
+      'powershell.exe',
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        WINDOWS_ACTIVATE_SCRIPT
+      ],
+      {
+        env: { ...process.env, ENERGY_EXTERNAL_APP_PATH: filePath },
+        timeout: 8_000,
+        windowsHide: true
+      },
+      (error, stdout) => {
+        if (error) {
+          resolve('unsupported')
+          return
+        }
+
+        switch (stdout.trim()) {
+          case 'NOT_RUNNING':
+            resolve('not-running')
+            break
+          case 'ACTIVATED':
+            resolve('activated')
+            break
+          case 'ALREADY_RUNNING':
+            resolve('already-running')
+            break
+          default:
+            resolve('unsupported')
+        }
+      }
+    )
+  })
 
 const emptySettings = (): ExternalAppSettings => ({ path: '', name: '' })
 
@@ -48,6 +170,45 @@ const inferAppName = (filePath: string): string => {
 
 const getDialogProperties = (): Array<'openFile' | 'openDirectory'> =>
   process.platform === 'darwin' ? ['openFile', 'openDirectory'] : ['openFile']
+
+const launchExternalApp = async (): Promise<ExternalAppActionResult> => {
+  const settings = readSettings()
+
+  if (!settings.path) {
+    return { success: false, settings, error: '请先在系统设置中选择要跳转的软件' }
+  }
+
+  if (!existsSync(settings.path)) {
+    return {
+      success: false,
+      settings,
+      error: '已配置的软件不存在，请在系统设置中重新选择'
+    }
+  }
+
+  if (process.platform === 'win32') {
+    const activationResult = await activateRunningWindowsApp(settings.path)
+
+    if (activationResult === 'activated') {
+      return { success: true, settings, error: '', action: 'activated' }
+    }
+
+    if (activationResult === 'already-running') {
+      return { success: true, settings, error: '', action: 'already-running' }
+    }
+  }
+
+  const error = await shell.openPath(settings.path)
+  return {
+    success: error.length === 0,
+    settings,
+    error,
+    action: error.length === 0 ? 'launched' : undefined
+  }
+}
+
+let pendingLaunch: Promise<ExternalAppActionResult> | null = null
+const LAUNCH_DEBOUNCE_MS = 1_500
 
 export function registerExternalAppIpc(): void {
   ipcMain.handle('external-app:get-settings', () => readSettings())
@@ -93,21 +254,15 @@ export function registerExternalAppIpc(): void {
   )
 
   ipcMain.handle('external-app:launch', async (): Promise<ExternalAppActionResult> => {
-    const settings = readSettings()
+    const launch = pendingLaunch ?? launchExternalApp()
+    pendingLaunch = launch
 
-    if (!settings.path) {
-      return { success: false, settings, error: '请先在系统设置中选择要跳转的软件' }
+    try {
+      return await launch
+    } finally {
+      setTimeout(() => {
+        if (pendingLaunch === launch) pendingLaunch = null
+      }, LAUNCH_DEBOUNCE_MS)
     }
-
-    if (!existsSync(settings.path)) {
-      return {
-        success: false,
-        settings,
-        error: '已配置的软件不存在，请在系统设置中重新选择'
-      }
-    }
-
-    const error = await shell.openPath(settings.path)
-    return { success: error.length === 0, settings, error }
   })
 }

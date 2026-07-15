@@ -108,6 +108,26 @@ export function closeWeatherDatabase(): void {
   database = null
 }
 
+export function getAppMetadataValue(key: string): string | null {
+  const row = getWeatherDatabase()
+    .prepare('SELECT value FROM app_metadata WHERE key = ?')
+    .get(normalizeMetadataKey(key)) as { value: string } | undefined
+
+  return row?.value ?? null
+}
+
+export function setAppMetadataValue(key: string, value: string): void {
+  getWeatherDatabase()
+    .prepare('INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?)')
+    .run(normalizeMetadataKey(key), String(value))
+}
+
+export function removeAppMetadataValue(key: string): void {
+  getWeatherDatabase()
+    .prepare('DELETE FROM app_metadata WHERE key = ?')
+    .run(normalizeMetadataKey(key))
+}
+
 export function listWeatherRecords(query: WeatherListQuery = {}): WeatherRecord[] {
   const db = getWeatherDatabase()
   const params: Record<string, string> = {}
@@ -733,6 +753,16 @@ function normalizeId(id: number): number {
   }
 
   return recordId
+}
+
+function normalizeMetadataKey(key: string): string {
+  const normalizedKey = String(key ?? '').trim()
+
+  if (!normalizedKey || normalizedKey.length > 100) {
+    throw new Error('应用配置键不正确')
+  }
+
+  return normalizedKey
 }
 
 function normalizeSeason(season: WeatherSeason): WeatherSeason {

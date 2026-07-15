@@ -1274,8 +1274,8 @@ const createTrafficWritePoint = (input: unknown): PlcWritePoint => {
 const createDashboardDateWritePoint = (input: unknown): PlcWritePoint => {
   const dateCode = getIntegerWriteNumber(input, '仪表盘日期编码')
 
-  if (dateCode < 1 || dateCode > 3) {
-    throw new Error('仪表盘日期编码必须是 1、2 或 3。')
+  if (dateCode < 0 || dateCode > 2) {
+    throw new Error('仪表盘日期编码必须是 0、1 或 2。')
   }
 
   return createWeatherWritePoint({

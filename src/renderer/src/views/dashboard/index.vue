@@ -16,16 +16,22 @@ import EnergyPredictionPanel from './EnergyPredictionPanel.vue'
 import EnvironmentPanel from './EnvironmentPanel.vue'
 import MonitorPanels from './MonitorPanels.vue'
 import WeatherForecastPanel from './WeatherForecastPanel.vue'
+import { claimInitialDateWrite, dashboardYear, selectedDashboardDate } from './dateState'
 
 const router = useRouter()
-const dashboardYear = new Date().getFullYear()
 const allowedDashboardDates = [
   new Date(dashboardYear, 0, 3),
   new Date(dashboardYear, 3, 3),
   new Date(dashboardYear, 7, 3)
 ]
-const selectedDate = ref(new Date(dashboardYear, 3, 3))
-const pickerDate = ref(new Date(dashboardYear, 3, 3))
+const selectedDate = selectedDashboardDate
+const pickerDate = ref(
+  new Date(
+    selectedDate.value.getFullYear(),
+    selectedDate.value.getMonth(),
+    selectedDate.value.getDate()
+  )
+)
 const datePickerRef = ref<{
   handleClose: () => void
   blur: () => void
@@ -127,37 +133,48 @@ const handleDateChange = async (date: Date | null): Promise<void> => {
     return
   }
 
+  const nextDate = cloneDate(date)
   closeDatePicker()
 
   try {
-    await ElMessageBox.confirm(`是否确认查询 ${formatConfirmDate(date)} 的天气情况？`, '预测确认', {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-
-    selectedDate.value = cloneDate(date)
-    pickerDate.value = cloneDate(date)
-    weatherPredictionToken.value += 1
-    closeDatePicker()
-
-    const dateCode = getDashboardDateCode(date)
-    isDashboardDateWriting.value = true
-
-    try {
-      const result = await window.api.plc.writeDashboardDate(dateCode)
-
-      if (!result.ok) {
-        ElMessage.error(result.error || result.statusText || '日期编码写入失败')
+    await ElMessageBox.confirm(
+      `是否确认查询 ${formatConfirmDate(nextDate)} 的天气情况？`,
+      '预测确认',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: 'warning'
       }
-    } catch (error) {
-      ElMessage.error(getErrorMessage(error, '日期编码写入失败'))
-    } finally {
-      isDashboardDateWriting.value = false
-    }
+    )
   } catch {
     pickerDate.value = cloneDate(selectedDate.value)
     closeDatePicker()
+    return
+  }
+
+  const dateCode = getDashboardDateCode(nextDate)
+  isDashboardDateWriting.value = true
+
+  try {
+    const result = await window.api.plc.writeDashboardDate(dateCode)
+
+    if (!result.ok) {
+      pickerDate.value = cloneDate(selectedDate.value)
+      closeDatePicker()
+      ElMessage.error(result.error || result.statusText || '日期编码写入失败')
+      return
+    }
+
+    selectedDate.value = nextDate
+    pickerDate.value = cloneDate(nextDate)
+    weatherPredictionToken.value += 1
+    closeDatePicker()
+  } catch (error) {
+    pickerDate.value = cloneDate(selectedDate.value)
+    closeDatePicker()
+    ElMessage.error(getErrorMessage(error, '日期编码写入失败'))
+  } finally {
+    isDashboardDateWriting.value = false
   }
 }
 
@@ -197,9 +214,9 @@ const getSeasonByMonth = (month: number): WeatherSeason => {
 
 const getDashboardDateCode = (date: Date): number => {
   const codeByMonth: Record<number, number> = {
-    4: 1,
-    8: 2,
-    1: 3
+    4: 0,
+    8: 1,
+    1: 2
   }
 
   return codeByMonth[date.getMonth() + 1]
@@ -208,9 +225,29 @@ const getDashboardDateCode = (date: Date): number => {
 const getErrorMessage = (error: unknown, fallback: string): string =>
   error instanceof Error && error.message ? error.message : fallback
 
+const writeInitialDashboardDate = async (): Promise<void> => {
+  if (!claimInitialDateWrite()) {
+    return
+  }
+
+  isDashboardDateWriting.value = true
+
+  try {
+    const dateCode = getDashboardDateCode(selectedDate.value)
+    const result = await window.api.plc.writeDashboardDate(dateCode)
+
+    if (!result.ok) {
+      ElMessage.error(result.error || result.statusText || '4月3日日期编码写入失败')
+    }
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '4月3日日期编码写入失败'))
+  } finally {
+    isDashboardDateWriting.value = false
+  }
+}
+
 onMounted(async () => {
-  selectedDate.value = new Date(dashboardYear, 3, 3)
-  pickerDate.value = new Date(dashboardYear, 3, 3)
+  pickerDate.value = cloneDate(selectedDate.value)
   clockNow.value = new Date()
   clockTimer = window.setInterval(() => {
     clockNow.value = new Date()
@@ -219,6 +256,8 @@ onMounted(async () => {
   unsubscribeFullscreenChanged = window.api.window.onFullscreenChanged((fullscreen) => {
     isFullscreen.value = fullscreen
   })
+
+  await writeInitialDashboardDate()
 
   try {
     isFullscreen.value = await window.api.window.getFullscreen()

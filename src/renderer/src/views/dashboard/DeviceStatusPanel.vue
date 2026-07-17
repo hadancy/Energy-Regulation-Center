@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { ElNotification } from 'element-plus'
 import { Cpu, DataAnalysis, Lightning, SwitchButton, Watermelon } from '@element-plus/icons-vue'
 
 type DeviceStatus = '正常' | '关注' | '预警'
@@ -21,8 +22,12 @@ interface DevicePrediction {
 }
 
 const plcState = ref<PlcState | null>(null)
+const SOC_WARNING_THRESHOLD = 45
+const SOC_DANGER_THRESHOLD = 30
 
 let unsubscribePlcUpdate: (() => void) | null = null
+let socLowNotification: ReturnType<typeof ElNotification.warning> | null = null
+let socAlertLevel: 'warning' | 'danger' | null = null
 
 const clampPercent = (value: number): number => Math.min(100, Math.max(0, value))
 
@@ -68,6 +73,18 @@ const getBatteryStatus = (value: number | null): DeviceStatus => {
   return value > 75 ? '关注' : '预警'
 }
 
+const getSocStatus = (value: number | null): DeviceStatus => {
+  if (value === null) {
+    return '关注'
+  }
+
+  if (value > SOC_WARNING_THRESHOLD) {
+    return '正常'
+  }
+
+  return value >= SOC_DANGER_THRESHOLD ? '关注' : '预警'
+}
+
 const getTone = (status: DeviceStatus): DeviceTone => {
   if (status === '正常') {
     return 'success'
@@ -76,12 +93,14 @@ const getTone = (status: DeviceStatus): DeviceTone => {
   return status === '关注' ? 'warning' : 'danger'
 }
 
+const totalSoc = computed(() => getReadingValue('socTotal', '总SOC值'))
+
 const devicePredictions = computed<DevicePrediction[]>(() => {
-  const socTotal = getReadingValue('socTotal', '总SOC值')
+  const socTotal = totalSoc.value
   const renewableVoltage = getReadingValue('renewableEnergyVoltage', '新能源电压')
   const phsStatusValue = getReadingValue('phsStatus', '蓄水储能状态')
   const bessStatusValue = getReadingValue('bessStatus', '储能电池状态')
-  const socStatus = getNumericStatus(socTotal, 30, 15)
+  const socStatus = getSocStatus(socTotal)
   const voltageStatus = getNumericStatus(renewableVoltage, 95, 90)
   const phsStatus = getNumericStatus(phsStatusValue, 75, 50)
   const bessStatus = getBatteryStatus(bessStatusValue)
@@ -93,8 +112,8 @@ const devicePredictions = computed<DevicePrediction[]>(() => {
       valueText: formatInteger(socTotal),
       meterValue: socTotal === null ? 0 : clampPercent(socTotal),
       unit: '%',
-      thresholdText: '30%',
-      lowThresholdText: '15%',
+      thresholdText: `${SOC_WARNING_THRESHOLD}%`,
+      lowThresholdText: `${SOC_DANGER_THRESHOLD}%`,
       status: socStatus,
       tone: getTone(socStatus),
       icon: DataAnalysis
@@ -142,6 +161,39 @@ const activeIssueCount = computed(
   () => devicePredictions.value.filter((device) => device.status !== '正常').length
 )
 
+watch(totalSoc, (value) => {
+  if (value === null) {
+    return
+  }
+
+  if (value > SOC_WARNING_THRESHOLD) {
+    socLowNotification?.close()
+    socLowNotification = null
+    socAlertLevel = null
+    return
+  }
+
+  const nextAlertLevel = value < SOC_DANGER_THRESHOLD ? 'danger' : 'warning'
+  if (socLowNotification && socAlertLevel === nextAlertLevel) {
+    return
+  }
+
+  socLowNotification?.close()
+  socAlertLevel = nextAlertLevel
+  socLowNotification = ElNotification({
+    title: 'SOC不足',
+    message:
+      nextAlertLevel === 'danger'
+        ? `当前总SOC值为 ${value}%，低于 ${SOC_DANGER_THRESHOLD}%红色警戒线`
+        : `当前总SOC值为 ${value}%，已达到或低于 ${SOC_WARNING_THRESHOLD}%黄色提醒线`,
+    type: nextAlertLevel === 'danger' ? 'error' : 'warning',
+    position: 'top-right',
+    duration: 0,
+    showClose: true,
+    customClass: 'app-no-drag'
+  })
+})
+
 const loadPlcState = async (): Promise<void> => {
   try {
     plcState.value = await window.api.plc.getState()
@@ -184,6 +236,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   unsubscribePlcUpdate?.()
   unsubscribePlcUpdate = null
+  socLowNotification?.close()
+  socLowNotification = null
+  socAlertLevel = null
 })
 </script>
 

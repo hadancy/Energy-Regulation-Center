@@ -1,6 +1,6 @@
 {
   "name": "energy-control-center",
-  "version": "1.0.0",
+  "version": "1.7.17",
   "description": "能源调控中心桌面应用",
   "main": "./out/main/index.js",
   "author": "example.com",
@@ -29,6 +29,7 @@
     "echarts": "^6.1.0",
     "element-plus": "^2.14.2",
     "modbus-serial": "^8.0.25",
+    "nodemailer": "^9.0.3",
     "serialport": "file:stubs/serialport",
     "tailwindcss": "^4.3.2",
     "vue-router": "^5.1.0"
@@ -39,6 +40,7 @@
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.1",
+    "@types/nodemailer": "^8.0.1",
     "@vitejs/plugin-vue": "^6.0.2",
     "electron": "^39.2.6",
     "electron-builder": "^26.0.12",

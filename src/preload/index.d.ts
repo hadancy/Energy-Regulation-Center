@@ -211,6 +211,30 @@ export interface PlcWeatherWriteResult {
 export type PlcTrafficWriteResult = PlcWeatherWriteResult
 export type PlcDashboardDateWriteResult = PlcWeatherWriteResult
 
+export type PlcWorkOrderStatus = 'idle' | 'monitoring' | 'completion-email-pending' | 'completed'
+
+export interface PlcWorkOrderState {
+  status: PlcWorkOrderStatus
+  statusText: string
+  workOrderNumber: string
+  startedAt: string
+  notificationEmailSentAt: string
+  notificationEmailMessageId: string
+  completedAt: string
+  completionEmailSentAt: string
+  completionEmailMessageId: string
+  completionEmailAttemptCount: number
+  lastCompletionEmailAttemptAt: string
+  lastCheckedAt: string
+  lastValue: number | null
+  lastError: string
+}
+
+export interface PlcWorkOrderTriggerWriteResult extends PlcWeatherWriteResult {
+  email: EmailSendResult
+  workOrder: PlcWorkOrderState
+}
+
 export interface ExternalAppSettings {
   path: string
   name: string
@@ -221,6 +245,44 @@ export interface ExternalAppActionResult {
   settings: ExternalAppSettings
   error: string
   action?: 'launched' | 'activated' | 'already-running'
+}
+
+export interface EmailRecipient {
+  id: string
+  name: string
+  email: string
+}
+
+export interface EmailSettings {
+  smtpHost: string
+  smtpPort: number
+  secure: boolean
+  user: string
+  senderName: string
+  hasAuthorizationCode: boolean
+  recipients: EmailRecipient[]
+  updatedAt: string
+}
+
+export interface EmailSettingsInput {
+  smtpHost: string
+  smtpPort: number
+  secure: boolean
+  user: string
+  authorizationCode?: string
+  senderName: string
+  recipients: EmailRecipient[]
+}
+
+export interface EmailSendResult {
+  ok: boolean
+  skipped: boolean
+  statusText: string
+  error: string
+  accepted: string[]
+  rejected: string[]
+  messageId: string
+  sentAt: string
 }
 
 export interface PlcState {
@@ -244,6 +306,7 @@ export interface PlcState {
   lastUpdatedTimestamp: number
   error: string
   consecutiveFailures: number
+  workOrder: PlcWorkOrderState
 }
 
 export interface AppAPI {
@@ -262,6 +325,7 @@ export interface AppAPI {
     writeWeather: (input: PlcWeatherWriteInput) => Promise<PlcWeatherWriteResult>
     writeTraffic: (value: number) => Promise<PlcTrafficWriteResult>
     writeDashboardDate: (value: number) => Promise<PlcDashboardDateWriteResult>
+    writeWorkOrderTrigger: () => Promise<PlcWorkOrderTriggerWriteResult>
     onUpdate: (callback: (state: PlcState) => void) => () => void
   }
   weather: {
@@ -281,6 +345,11 @@ export interface AppAPI {
     choose: () => Promise<ExternalAppActionResult>
     saveSettings: (settings: ExternalAppSettings) => Promise<ExternalAppSettings>
     launch: () => Promise<ExternalAppActionResult>
+  }
+  email: {
+    getSettings: () => Promise<EmailSettings>
+    saveSettings: (input: EmailSettingsInput) => Promise<EmailSettings>
+    test: () => Promise<EmailSendResult>
   }
   window: {
     getFullscreen: () => Promise<boolean>

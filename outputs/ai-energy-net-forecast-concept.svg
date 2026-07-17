@@ -1,0 +1,221 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="1010" viewBox="0 0 680 1010" role="img" aria-labelledby="title desc">
+  <title id="title">AI能源预测模块——净电量预测概念稿</title>
+  <desc id="desc">在发电量和用电量预测下方增加净电量预测图，零线上方表示盈余，零线下方表示缺口。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#031a30"/>
+      <stop offset="0.55" stop-color="#021529"/>
+      <stop offset="1" stop-color="#010d1b"/>
+    </linearGradient>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0c5d78" stop-opacity="0.52"/>
+      <stop offset="0.38" stop-color="#063c58" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#031a30" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#06243e" stop-opacity="0.97"/>
+      <stop offset="1" stop-color="#03182c" stop-opacity="0.97"/>
+    </linearGradient>
+    <linearGradient id="cyanArea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#19d8f2" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#19d8f2" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="blueArea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#35bdf5" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#35bdf5" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="surplusArea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#55f3c0" stop-opacity="0.36"/>
+      <stop offset="1" stop-color="#55f3c0" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="deficitArea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb14a" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#ff8a3d" stop-opacity="0.34"/>
+    </linearGradient>
+    <pattern id="microGrid" width="18" height="18" patternUnits="userSpaceOnUse">
+      <path d="M18 0H0V18" fill="none" stroke="#1ec8e6" stroke-opacity="0.035" stroke-width="1"/>
+    </pattern>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      text { font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif; }
+      .title { fill:#21dff3; font-size:22px; font-weight:700; letter-spacing:.5px; }
+      .chart-title { fill:#15dcf1; font-size:17px; font-weight:700; }
+      .axis { fill:#86a9bc; font-size:10px; }
+      .unit { fill:#22d3ee; font-size:10px; }
+      .legend { fill:#9fb9c8; font-size:10px; }
+      .grid { stroke:#45b9d2; stroke-opacity:.19; stroke-width:1; stroke-dasharray:4 4; }
+      .axis-line { stroke:#66bfd1; stroke-opacity:.30; stroke-width:1; }
+      .metric-label { fill:#a9bfd0; font-size:14px; }
+      .metric-value { fill:#effbff; font-size:25px; font-weight:700; }
+      .metric-sub { fill:#7f9bad; font-size:11px; }
+    </style>
+  </defs>
+
+  <rect width="680" height="1010" rx="8" fill="url(#bg)"/>
+  <rect width="680" height="1010" rx="8" fill="url(#microGrid)"/>
+  <path d="M6 22V7H23M657 7h17v17M674 986v18h-18M24 1004H6v-18" fill="none" stroke="#27d7ef" stroke-opacity="0.80" stroke-width="1.5"/>
+  <rect x="7" y="7" width="666" height="996" rx="4" fill="none" stroke="#1fc9e5" stroke-opacity="0.62"/>
+
+  <!-- Header -->
+  <path d="M20 10H659L648 63H20Z" fill="url(#header)" stroke="#1bd7ef" stroke-opacity="0.38"/>
+  <path d="M28 10H62L69 20V53H28L18 42V21Z" fill="#0c5973" fill-opacity="0.72" stroke="#23d8ee" stroke-opacity="0.48"/>
+  <g transform="translate(34 23)" stroke="#7aeafd" stroke-width="2" fill="none">
+    <path d="M0 19V8M8 19V2M16 19V11"/>
+    <path d="M-2 21H19" stroke-opacity=".65"/>
+  </g>
+  <text x="81" y="42" class="title">AI能源预测</text>
+  <g fill="#45d7f1" filter="url(#glow)">
+    <path d="M222 30h12l-6 7h-12z"/>
+    <path d="M242 30h12l-6 7h-12z" opacity=".8"/>
+    <path d="M262 30h12l-6 7h-12z" opacity=".6"/>
+  </g>
+  <rect x="507" y="21" width="132" height="25" rx="12.5" fill="#07344b" stroke="#1fbdd5" stroke-opacity=".48"/>
+  <circle cx="522" cy="33.5" r="3" fill="#58f2cf" filter="url(#glow)"/>
+  <text x="532" y="37" fill="#91bdc9" font-size="10">UI CONCEPT · 示意数据</text>
+
+  <!-- Generation chart -->
+  <rect x="24" y="78" width="632" height="204" rx="7" fill="url(#panel)" stroke="#0ea5c7" stroke-opacity=".52"/>
+  <text x="39" y="107" class="chart-title">24小时发电量预测（kWh）</text>
+  <circle cx="553" cy="104" r="4" fill="#23d9ef" filter="url(#glow)"/>
+  <text x="563" y="108" class="legend">预测发电量</text>
+  <text x="77" y="129" class="unit">kWh</text>
+  <g>
+    <line x1="77" y1="145" x2="632" y2="145" class="grid"/>
+    <line x1="77" y1="183" x2="632" y2="183" class="grid"/>
+    <line x1="77" y1="221" x2="632" y2="221" class="grid"/>
+    <line x1="77" y1="254" x2="632" y2="254" class="axis-line"/>
+    <text x="63" y="149" text-anchor="end" class="axis">9</text>
+    <text x="63" y="187" text-anchor="end" class="axis">6</text>
+    <text x="63" y="225" text-anchor="end" class="axis">3</text>
+    <text x="63" y="258" text-anchor="end" class="axis">0</text>
+  </g>
+  <path d="M77 244 C115 242 146 238 176 236 C214 232 248 218 279 201 C306 186 329 169 349 158 C367 147 386 142 405 143 C421 144 428 153 435 166 C446 181 476 189 505 203 C534 216 559 232 581 240 C598 245 613 240 632 243 L632 254 L77 254Z" fill="url(#cyanArea)"/>
+  <path d="M77 244 C115 242 146 238 176 236 C214 232 248 218 279 201 C306 186 329 169 349 158 C367 147 386 142 405 143 C421 144 428 153 435 166 C446 181 476 189 505 203 C534 216 559 232 581 240 C598 245 613 240 632 243" fill="none" stroke="#20d9ee" stroke-width="2.5" filter="url(#glow)"/>
+  <g class="axis">
+    <text x="77" y="271" text-anchor="middle">00:00</text><text x="156" y="271" text-anchor="middle">03:00</text>
+    <text x="235" y="271" text-anchor="middle">06:00</text><text x="314" y="271" text-anchor="middle">09:00</text>
+    <text x="393" y="271" text-anchor="middle">12:00</text><text x="472" y="271" text-anchor="middle">15:00</text>
+    <text x="551" y="271" text-anchor="middle">18:00</text><text x="630" y="271" text-anchor="middle">21:00</text>
+  </g>
+
+  <!-- Consumption chart -->
+  <rect x="24" y="294" width="632" height="204" rx="7" fill="url(#panel)" stroke="#0ea5c7" stroke-opacity=".52"/>
+  <text x="39" y="323" class="chart-title">24小时用电量预测（kWh）</text>
+  <circle cx="553" cy="320" r="4" fill="#38bdf8" filter="url(#glow)"/>
+  <text x="563" y="324" class="legend">预测用电量</text>
+  <text x="77" y="345" class="unit">kWh</text>
+  <g>
+    <line x1="77" y1="361" x2="632" y2="361" class="grid"/>
+    <line x1="77" y1="399" x2="632" y2="399" class="grid"/>
+    <line x1="77" y1="437" x2="632" y2="437" class="grid"/>
+    <line x1="77" y1="470" x2="632" y2="470" class="axis-line"/>
+    <text x="63" y="365" text-anchor="end" class="axis">3</text>
+    <text x="63" y="403" text-anchor="end" class="axis">2</text>
+    <text x="63" y="441" text-anchor="end" class="axis">1</text>
+    <text x="63" y="474" text-anchor="end" class="axis">0</text>
+  </g>
+  <path d="M77 391 L165 391 C178 391 182 395 185 413 C188 442 195 456 213 457 L509 457 C527 457 531 447 534 424 C537 399 544 391 563 391 L632 391 L632 470 L77 470Z" fill="url(#blueArea)"/>
+  <path d="M77 391 L165 391 C178 391 182 395 185 413 C188 442 195 456 213 457 L509 457 C527 457 531 447 534 424 C537 399 544 391 563 391 L632 391" fill="none" stroke="#39bef7" stroke-width="2.5" filter="url(#glow)"/>
+  <g class="axis">
+    <text x="77" y="487" text-anchor="middle">00:00</text><text x="156" y="487" text-anchor="middle">03:00</text>
+    <text x="235" y="487" text-anchor="middle">06:00</text><text x="314" y="487" text-anchor="middle">09:00</text>
+    <text x="393" y="487" text-anchor="middle">12:00</text><text x="472" y="487" text-anchor="middle">15:00</text>
+    <text x="551" y="487" text-anchor="middle">18:00</text><text x="630" y="487" text-anchor="middle">21:00</text>
+  </g>
+
+  <!-- Net energy chart -->
+  <rect x="24" y="510" width="632" height="250" rx="7" fill="url(#panel)" stroke="#20d9c6" stroke-opacity=".68"/>
+  <rect x="25" y="511" width="630" height="42" rx="6" fill="#0b3c4b" fill-opacity=".23"/>
+  <text x="39" y="540" class="chart-title">24小时净电量预测（kWh）</text>
+  <rect x="356" y="520" width="151" height="27" rx="13.5" fill="#073442" stroke="#39d8c0" stroke-opacity=".52"/>
+  <text x="431.5" y="538" text-anchor="middle" fill="#a9eee0" font-size="11" font-weight="600">发电量 − 用电量</text>
+  <circle cx="532" cy="528" r="4" fill="#55f3c0" filter="url(#glow)"/>
+  <text x="542" y="532" class="legend">电量盈余</text>
+  <circle cx="532" cy="544" r="4" fill="#ff9d45" filter="url(#glow)"/>
+  <text x="542" y="548" class="legend">电量缺口</text>
+  <text x="77" y="575" class="unit">kWh</text>
+  <g>
+    <line x1="77" y1="586" x2="632" y2="586" class="grid"/>
+    <line x1="77" y1="617" x2="632" y2="617" class="grid"/>
+    <line x1="77" y1="650" x2="632" y2="650" stroke="#d4f7fb" stroke-opacity=".48" stroke-width="1.2" stroke-dasharray="5 4"/>
+    <line x1="77" y1="682" x2="632" y2="682" class="grid"/>
+    <text x="63" y="590" text-anchor="end" class="axis">+6</text>
+    <text x="63" y="621" text-anchor="end" class="axis">+3</text>
+    <text x="63" y="654" text-anchor="end" fill="#d6f5f8" font-size="10" font-weight="700">0</text>
+    <text x="63" y="686" text-anchor="end" class="axis">−3</text>
+  </g>
+  <!-- Positive and negative fills are separated at the zero crossings -->
+  <path d="M194 650 C213 638 232 631 252 617 C278 599 301 582 327 568 C348 557 374 555 394 564 C415 576 427 590 449 603 C470 616 494 632 511 650 L194 650Z" fill="url(#surplusArea)"/>
+  <path d="M77 670 C111 668 141 666 165 668 C179 670 187 663 194 650 L194 650 L77 650Z M511 650 C524 659 531 669 545 674 C567 682 591 670 610 671 C620 671 627 674 632 676 L632 650Z" fill="url(#deficitArea)"/>
+  <path d="M77 670 C111 668 141 666 165 668 C179 670 187 663 194 650" fill="none" stroke="#ff9d45" stroke-width="2.8" filter="url(#glow)"/>
+  <path d="M194 650 C213 638 232 631 252 617 C278 599 301 582 327 568 C348 557 374 555 394 564 C415 576 427 590 449 603 C470 616 494 632 511 650" fill="none" stroke="#55f3c0" stroke-width="2.8" filter="url(#glow)"/>
+  <path d="M511 650 C524 659 531 669 545 674 C567 682 591 670 610 671 C620 671 627 674 632 676" fill="none" stroke="#ff9d45" stroke-width="2.8" filter="url(#glow)"/>
+  <circle cx="368" cy="557" r="4.5" fill="#c6fff2" stroke="#55f3c0" stroke-width="2" filter="url(#glow)"/>
+  <line x1="368" y1="557" x2="368" y2="650" stroke="#74dccc" stroke-opacity=".38" stroke-dasharray="3 3"/>
+  <g filter="url(#softGlow)"><rect x="286" y="565" width="178" height="80" rx="5" fill="#031526" fill-opacity=".96" stroke="#38d4c0" stroke-opacity=".58"/></g>
+  <text x="299" y="581" fill="#90aebd" font-size="10">12:00</text>
+  <circle cx="301" cy="595" r="3" fill="#20d9ee"/>
+  <text x="310" y="599" fill="#a9c3cf" font-size="10">预测发电量</text>
+  <text x="451" y="599" text-anchor="end" fill="#dffbff" font-size="10" font-weight="700">9.0 kWh</text>
+  <circle cx="301" cy="612" r="3" fill="#38bdf8"/>
+  <text x="310" y="616" fill="#a9c3cf" font-size="10">预测用电量</text>
+  <text x="451" y="616" text-anchor="end" fill="#dffbff" font-size="10" font-weight="700">0.4 kWh</text>
+  <circle cx="301" cy="630" r="3" fill="#55f3c0"/>
+  <text x="310" y="634" fill="#a9c3cf" font-size="10">预测净电量</text>
+  <text x="451" y="634" text-anchor="end" fill="#eafff9" font-size="12" font-weight="700">+8.6 kWh</text>
+  <g class="axis">
+    <text x="77" y="704" text-anchor="middle">00:00</text><text x="156" y="704" text-anchor="middle">03:00</text>
+    <text x="235" y="704" text-anchor="middle">06:00</text><text x="314" y="704" text-anchor="middle">09:00</text>
+    <text x="393" y="704" text-anchor="middle">12:00</text><text x="472" y="704" text-anchor="middle">15:00</text>
+    <text x="551" y="704" text-anchor="middle">18:00</text><text x="630" y="704" text-anchor="middle">21:00</text>
+  </g>
+  <rect x="39" y="718" width="270" height="27" rx="4" fill="#0a3e3d" fill-opacity=".46" stroke="#35d7b7" stroke-opacity=".30"/>
+  <circle cx="55" cy="731.5" r="3.5" fill="#55f3c0"/>
+  <text x="65" y="735" fill="#a8d7ce" font-size="10">0 线上方：电量盈余，可用于储能 / 上网</text>
+  <rect x="319" y="718" width="322" height="27" rx="4" fill="#402a1a" fill-opacity=".44" stroke="#ff9d45" stroke-opacity=".30"/>
+  <circle cx="335" cy="731.5" r="3.5" fill="#ff9d45"/>
+  <text x="345" y="735" fill="#d7c0aa" font-size="10">0 线下方：电量缺口，需储能 / 电网补能</text>
+
+  <!-- KPI cards, preserved from the existing module -->
+  <g>
+    <rect x="24" y="772" width="147" height="96" rx="6" fill="url(#panel)" stroke="#11a8c9" stroke-opacity=".52"/>
+    <path d="M49 797v13m-8-8a12 12 0 1 0 16 0" fill="none" stroke="#a7eff8" stroke-width="2"/>
+    <text x="79" y="803" class="metric-label">储能余量</text>
+    <text x="79" y="832" class="metric-value">40<tspan font-size="13">%</tspan></text>
+    <text x="79" y="850" class="metric-sub">PLC实时值</text>
+
+    <rect x="181" y="772" width="297" height="96" rx="6" fill="#07334a" fill-opacity=".72" stroke="#34d7ef" stroke-opacity=".60"/>
+    <path d="M218 817c-9-2-10-14-1-17c1-10 15-12 20-4c8 1 11 11 5 17l-8 9l1-11l-8 4l2-10" fill="none" stroke="#e5fbff" stroke-width="2.4" filter="url(#glow)"/>
+    <text x="260" y="803" class="metric-label">综合能效</text>
+    <text x="260" y="834" class="metric-value">0<tspan font-size="13">%</tspan></text>
+    <text x="260" y="852" class="metric-sub">核心效率指标</text>
+
+    <rect x="488" y="772" width="168" height="96" rx="6" fill="url(#panel)" stroke="#11a8c9" stroke-opacity=".52"/>
+    <path d="M508 817h22v-24h-22zM512 808l4-5l4 3l7-8" fill="none" stroke="#d8f8ff" stroke-width="2"/>
+    <text x="541" y="803" class="metric-label">自发自用率</text>
+    <text x="541" y="832" class="metric-value">0<tspan font-size="13">%</tspan></text>
+    <text x="541" y="850" class="metric-sub">PLC实时值</text>
+
+    <rect x="24" y="878" width="306" height="103" rx="6" fill="#07334a" fill-opacity=".64" stroke="#34d7ef" stroke-opacity=".54"/>
+    <path d="M63 953v-40m1 4c11 0 17 2 24 5v13c-7-3-13-5-24-5m6-12v14m8-13v14" fill="none" stroke="#dcf9ff" stroke-width="2.2"/>
+    <text x="118" y="915" class="metric-label">总碳减排量</text>
+    <text x="118" y="947" class="metric-value">0<tspan font-size="13"> t</tspan></text>
+    <text x="118" y="965" class="metric-sub">重点低碳指标</text>
+
+    <rect x="340" y="878" width="316" height="103" rx="6" fill="#07334a" fill-opacity=".64" stroke="#34d7ef" stroke-opacity=".54"/>
+    <path d="M381 920l4-3l4 3l5-2l2 5l5 2l-2 5l2 5l-5 2l-2 5l-5-2l-4 3l-4-3l-5 2l-2-5l-5-2l2-5l-2-5l5-2l2-5z" fill="#d9fbff" opacity=".9"/>
+    <circle cx="385" cy="930" r="5" fill="#07334a"/>
+    <text x="417" y="915" class="metric-label">设备维保</text>
+    <text x="417" y="947" class="metric-value">50.00<tspan font-size="13">%</tspan></text>
+    <text x="417" y="965" class="metric-sub">距上次 90 天</text>
+    <rect x="550" y="914" width="87" height="29" rx="4" fill="#4b350c" fill-opacity=".58" stroke="#ffc14c" stroke-opacity=".65"/>
+    <text x="593.5" y="933" text-anchor="middle" fill="#ffe28a" font-size="12" font-weight="700">↻ 已维保</text>
+  </g>
+</svg>

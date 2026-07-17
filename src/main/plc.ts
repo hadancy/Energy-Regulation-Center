@@ -6,6 +6,12 @@ import {
   removeAppMetadataValue,
   setAppMetadataValue
 } from './database/weatherRepository'
+import {
+  createSkippedEmailResult,
+  sendWorkOrderCompletionNotification,
+  sendWorkOrderNotification,
+  type EmailSendResult
+} from './email'
 
 const PLC_PROTOCOL = process.env['PLC_PROTOCOL'] ?? 'Modbus TCP'
 const PLC_BRAND = process.env['PLC_BRAND'] ?? '西门子'
@@ -29,6 +35,10 @@ const PLC_TIMEOUT_MS = Number.parseInt(process.env['PLC_TIMEOUT_MS'] ?? '3000', 
 const PLC_READ_POINTS_JSON = process.env['PLC_READ_POINTS'] ?? ''
 const PLC_CONFIGURATION_KEY = 'plc_configuration_v1'
 const PLC_CONFIGURATION_VERSION = 1
+const WORK_ORDER_STATE_KEY = 'work_order_monitor_state_v1'
+const WORK_ORDER_STATE_VERSION = 1
+const WORK_ORDER_NUMBER = 'CN-GC-26374'
+const WORK_ORDER_COMPLETION_EMAIL_RETRY_MS = 60_000
 
 const DEFAULT_PORT = Number.isFinite(PLC_PORT)
   ? PLC_PORT
@@ -184,6 +194,30 @@ export interface PlcWeatherWriteResult extends PlcConnectionConfig {
 export type PlcTrafficWriteResult = PlcWeatherWriteResult
 export type PlcDashboardDateWriteResult = PlcWeatherWriteResult
 
+export type PlcWorkOrderStatus = 'idle' | 'monitoring' | 'completion-email-pending' | 'completed'
+
+export interface PlcWorkOrderState {
+  status: PlcWorkOrderStatus
+  statusText: string
+  workOrderNumber: string
+  startedAt: string
+  notificationEmailSentAt: string
+  notificationEmailMessageId: string
+  completedAt: string
+  completionEmailSentAt: string
+  completionEmailMessageId: string
+  completionEmailAttemptCount: number
+  lastCompletionEmailAttemptAt: string
+  lastCheckedAt: string
+  lastValue: number | null
+  lastError: string
+}
+
+export interface PlcWorkOrderTriggerWriteResult extends PlcWeatherWriteResult {
+  email: EmailSendResult
+  workOrder: PlcWorkOrderState
+}
+
 export interface PlcState extends PlcConnectionConfig {
   protocol: string
   brand: string
@@ -201,6 +235,11 @@ export interface PlcState extends PlcConnectionConfig {
   lastUpdatedTimestamp: number
   error: string
   consecutiveFailures: number
+  workOrder: PlcWorkOrderState
+}
+
+interface PersistedWorkOrderState extends PlcWorkOrderState {
+  version: typeof WORK_ORDER_STATE_VERSION
 }
 
 const dataTypes = new Set<PlcPointDataType>(['uint16', 'int16', 'uint32', 'int32', 'float32'])
@@ -640,11 +679,31 @@ const initialReadPoints = createDefaultReadPoints()
 const initialLegacyAddressState = deriveLegacyAddressState(initialReadPoints)
 
 let pollTimer: NodeJS.Timeout | null = null
+let workOrderMonitorTimer: NodeJS.Timeout | null = null
+let workOrderCheckInProgress = false
 let polling = false
 let testingConnection = false
 let activePlcWriteCount = 0
 let modbusConnectionQueue: Promise<void> = Promise.resolve()
 const modbusConnectionReleases = new WeakMap<ModbusRTU, () => void>()
+
+const createIdleWorkOrderState = (): PlcWorkOrderState => ({
+  status: 'idle',
+  statusText: '暂无进行中的工单',
+  workOrderNumber: WORK_ORDER_NUMBER,
+  startedAt: '',
+  notificationEmailSentAt: '',
+  notificationEmailMessageId: '',
+  completedAt: '',
+  completionEmailSentAt: '',
+  completionEmailMessageId: '',
+  completionEmailAttemptCount: 0,
+  lastCompletionEmailAttemptAt: '',
+  lastCheckedAt: '',
+  lastValue: null,
+  lastError: ''
+})
+
 let state: PlcState = {
   protocol: PLC_PROTOCOL,
   brand: PLC_BRAND,
@@ -663,7 +722,8 @@ let state: PlcState = {
   lastUpdatedAt: '',
   lastUpdatedTimestamp: 0,
   error: '',
-  consecutiveFailures: 0
+  consecutiveFailures: 0,
+  workOrder: createIdleWorkOrderState()
 }
 
 function getRawErrorMessage(error: unknown): string {
@@ -766,7 +826,8 @@ const getPlcState = (): PlcState => ({
   ...state,
   values: { ...state.values },
   points: state.points.map(clonePoint),
-  readings: state.readings.map(cloneReading)
+  readings: state.readings.map(cloneReading),
+  workOrder: { ...state.workOrder }
 })
 
 const broadcastPlcState = (): void => {
@@ -785,7 +846,8 @@ const updateState = (nextState: Partial<PlcState>): void => {
     ...nextState,
     values: nextState.values ? { ...nextState.values } : state.values,
     points: nextState.points ? nextState.points.map(clonePoint) : state.points,
-    readings: nextState.readings ? nextState.readings.map(cloneReading) : state.readings
+    readings: nextState.readings ? nextState.readings.map(cloneReading) : state.readings,
+    workOrder: nextState.workOrder ? { ...nextState.workOrder } : state.workOrder
   }
   broadcastPlcState()
 }
@@ -1336,6 +1398,34 @@ const createDashboardDateWritePoint = (input: unknown): PlcWritePoint => {
     valueKind: 'number'
   })
 }
+
+const createWorkOrderTriggerWritePoint = (): PlcWritePoint => {
+  return createWeatherWritePoint({
+    id: 'workOrderTrigger',
+    name: '工单提示',
+    registerArea: 'MW',
+    offsetAddress: 680,
+    dataType: 'uint16',
+    scale: 1,
+    unit: '',
+    sourceValue: 1,
+    displayValue: 'true',
+    rawValue: 1,
+    valueKind: 'number'
+  })
+}
+
+const createWorkOrderMonitorReadPoint = (): PlcReadPoint => ({
+  id: 'workOrderMonitor',
+  name: '工单状态',
+  registerArea: 'MW',
+  dbBlock: DEFAULT_DB_BLOCK,
+  offsetAddress: 680,
+  dataType: 'uint16',
+  scale: 1,
+  unit: '',
+  enabled: true
+})
 
 const createPointWriteResult = (
   point: PlcWritePoint,
@@ -2137,6 +2227,249 @@ const resetPlcConfiguration = (): PlcState => {
   return applyPlcConfiguration(config, points)
 }
 
+const workOrderStatuses = new Set<PlcWorkOrderStatus>([
+  'idle',
+  'monitoring',
+  'completion-email-pending',
+  'completed'
+])
+
+const getOptionalText = (value: unknown): string => (typeof value === 'string' ? value.trim() : '')
+
+const normalizeWorkOrderState = (value: unknown): PlcWorkOrderState => {
+  if (!value || typeof value !== 'object') {
+    return createIdleWorkOrderState()
+  }
+
+  const candidate = value as Partial<PlcWorkOrderState>
+  const status = workOrderStatuses.has(candidate.status as PlcWorkOrderStatus)
+    ? (candidate.status as PlcWorkOrderStatus)
+    : 'idle'
+  const lastValue =
+    candidate.lastValue === null || candidate.lastValue === undefined
+      ? Number.NaN
+      : Number(candidate.lastValue)
+
+  return {
+    status,
+    statusText: getOptionalText(candidate.statusText) || createIdleWorkOrderState().statusText,
+    workOrderNumber: getOptionalText(candidate.workOrderNumber) || WORK_ORDER_NUMBER,
+    startedAt: getOptionalText(candidate.startedAt),
+    notificationEmailSentAt: getOptionalText(candidate.notificationEmailSentAt),
+    notificationEmailMessageId: getOptionalText(candidate.notificationEmailMessageId),
+    completedAt: getOptionalText(candidate.completedAt),
+    completionEmailSentAt: getOptionalText(candidate.completionEmailSentAt),
+    completionEmailMessageId: getOptionalText(candidate.completionEmailMessageId),
+    completionEmailAttemptCount: toNonNegativeInteger(candidate.completionEmailAttemptCount, 0),
+    lastCompletionEmailAttemptAt: getOptionalText(candidate.lastCompletionEmailAttemptAt),
+    lastCheckedAt: getOptionalText(candidate.lastCheckedAt),
+    lastValue: Number.isFinite(lastValue) ? lastValue : null,
+    lastError: getOptionalText(candidate.lastError)
+  }
+}
+
+const persistWorkOrderState = (workOrder: PlcWorkOrderState): void => {
+  const persistedState: PersistedWorkOrderState = {
+    version: WORK_ORDER_STATE_VERSION,
+    ...workOrder
+  }
+
+  setAppMetadataValue(WORK_ORDER_STATE_KEY, JSON.stringify(persistedState))
+}
+
+const updateWorkOrderState = (nextState: Partial<PlcWorkOrderState>): PlcWorkOrderState => {
+  const workOrder = normalizeWorkOrderState({ ...state.workOrder, ...nextState })
+  persistWorkOrderState(workOrder)
+  updateState({ workOrder })
+  return { ...workOrder }
+}
+
+const isWorkOrderActive = (workOrder: PlcWorkOrderState = state.workOrder): boolean =>
+  workOrder.status === 'monitoring' || workOrder.status === 'completion-email-pending'
+
+const getWorkOrderState = (): PlcWorkOrderState => ({ ...state.workOrder })
+
+export const stopWorkOrderMonitoring = (): void => {
+  if (workOrderMonitorTimer) {
+    clearTimeout(workOrderMonitorTimer)
+    workOrderMonitorTimer = null
+  }
+}
+
+const scheduleWorkOrderMonitoring = (delayMs = state.pollIntervalMs): void => {
+  if (!isWorkOrderActive() || workOrderMonitorTimer) {
+    return
+  }
+
+  workOrderMonitorTimer = setTimeout(
+    () => {
+      workOrderMonitorTimer = null
+      void monitorWorkOrderOnce()
+    },
+    Math.max(250, delayMs)
+  )
+}
+
+const startWorkOrderMonitoring = (): void => {
+  if (!isWorkOrderActive()) {
+    return
+  }
+
+  scheduleWorkOrderMonitoring(0)
+}
+
+const sendPendingWorkOrderCompletionEmail = async (force = false): Promise<void> => {
+  const workOrder = getWorkOrderState()
+
+  if (workOrder.status !== 'completion-email-pending' || !workOrder.completedAt) {
+    return
+  }
+
+  const previousAttemptTimestamp = Date.parse(workOrder.lastCompletionEmailAttemptAt)
+  const elapsedSincePreviousAttempt = Date.now() - previousAttemptTimestamp
+
+  if (
+    !force &&
+    Number.isFinite(previousAttemptTimestamp) &&
+    elapsedSincePreviousAttempt < WORK_ORDER_COMPLETION_EMAIL_RETRY_MS
+  ) {
+    return
+  }
+
+  const attemptStartedAt = new Date().toISOString()
+  updateWorkOrderState({
+    statusText: '已检测到 MW680=0，正在发送工单完成邮件',
+    completionEmailAttemptCount: workOrder.completionEmailAttemptCount + 1,
+    lastCompletionEmailAttemptAt: attemptStartedAt,
+    lastError: ''
+  })
+
+  const email = await sendWorkOrderCompletionNotification(workOrder.completedAt)
+
+  if (email.ok) {
+    updateWorkOrderState({
+      status: 'completed',
+      statusText: '工单已完成，完成邮件已发送',
+      completionEmailSentAt: email.sentAt,
+      completionEmailMessageId: email.messageId,
+      lastError: ''
+    })
+    stopWorkOrderMonitoring()
+    return
+  }
+
+  updateWorkOrderState({
+    status: 'completion-email-pending',
+    statusText: '工单已完成，完成邮件发送失败，后台将自动重试',
+    lastError: email.error || '工单完成邮件发送失败。'
+  })
+}
+
+const monitorWorkOrderOnce = async (): Promise<void> => {
+  if (workOrderCheckInProgress || !isWorkOrderActive()) {
+    return
+  }
+
+  workOrderCheckInProgress = true
+
+  try {
+    if (state.workOrder.status === 'completion-email-pending') {
+      await sendPendingWorkOrderCompletionEmail()
+      return
+    }
+
+    if (isS7Protocol()) {
+      throw new Error('当前 S7 原生协议暂不支持 MW680 工单状态监测。')
+    }
+
+    const point = createWorkOrderMonitorReadPoint()
+    const readings = await readModbusPointListWithConnection(getCurrentConnectionConfig(), [point])
+    const reading = readings[0]
+
+    if (!reading || reading.status !== 'success' || reading.rawValue === null) {
+      throw new Error(reading?.error || 'MW680 点位读取失败。')
+    }
+
+    const checkedAt = new Date().toISOString()
+
+    if (reading.rawValue === 0) {
+      updateWorkOrderState({
+        status: 'completion-email-pending',
+        statusText: '已检测到 MW680=0，等待发送工单完成邮件',
+        completedAt: checkedAt,
+        lastCheckedAt: checkedAt,
+        lastValue: 0,
+        lastError: ''
+      })
+      await sendPendingWorkOrderCompletionEmail(true)
+      return
+    }
+
+    updateWorkOrderState({
+      status: 'monitoring',
+      statusText: `工单处理中，正在监测 MW680（当前值：${reading.rawValue}）`,
+      lastCheckedAt: checkedAt,
+      lastValue: reading.rawValue,
+      lastError: ''
+    })
+  } catch (error) {
+    const message = getErrorMessage(error)
+    console.error(`[PLC] 工单状态监测失败：${message}`)
+    updateWorkOrderState({
+      statusText: '工单处理中，MW680 状态读取失败，后台将继续监测',
+      lastCheckedAt: new Date().toISOString(),
+      lastError: message
+    })
+  } finally {
+    workOrderCheckInProgress = false
+    scheduleWorkOrderMonitoring()
+  }
+}
+
+const activateWorkOrderMonitoring = (email: EmailSendResult): PlcWorkOrderState => {
+  const startedAt = new Date().toISOString()
+  const workOrder = updateWorkOrderState({
+    status: 'monitoring',
+    statusText: '提醒邮件已发送，正在监测 MW680',
+    workOrderNumber: WORK_ORDER_NUMBER,
+    startedAt,
+    notificationEmailSentAt: email.sentAt || startedAt,
+    notificationEmailMessageId: email.messageId,
+    completedAt: '',
+    completionEmailSentAt: '',
+    completionEmailMessageId: '',
+    completionEmailAttemptCount: 0,
+    lastCompletionEmailAttemptAt: '',
+    lastCheckedAt: startedAt,
+    lastValue: 1,
+    lastError: ''
+  })
+
+  startWorkOrderMonitoring()
+  return workOrder
+}
+
+const loadPersistedWorkOrderState = (): void => {
+  try {
+    const storedValue = getAppMetadataValue(WORK_ORDER_STATE_KEY)
+
+    if (!storedValue) {
+      return
+    }
+
+    const parsed = JSON.parse(storedValue) as Partial<PersistedWorkOrderState>
+
+    if (parsed.version !== WORK_ORDER_STATE_VERSION) {
+      throw new Error(`不支持的工单状态版本：${String(parsed.version ?? '')}`)
+    }
+
+    updateState({ workOrder: normalizeWorkOrderState(parsed) })
+    startWorkOrderMonitoring()
+  } catch (error) {
+    console.error(`[PLC] 持久化工单状态加载失败：${getRawErrorMessage(error)}`)
+  }
+}
+
 const testPlcConnection = async (input: PlcTestInput = {}): Promise<PlcTestResult> => {
   const startedAt = new Date()
   const config = normalizeConnectionConfig(input)
@@ -2376,6 +2709,97 @@ const writeDashboardDateToPlc = async (input: unknown): Promise<PlcDashboardDate
   }
 }
 
+const writeWorkOrderTriggerToPlc = async (): Promise<PlcWorkOrderTriggerWriteResult> => {
+  const startedAt = new Date()
+  const config = getCurrentConnectionConfig()
+  let points: PlcWritePoint[] = []
+  let writes: PlcWritePointResult[] = []
+  let ok = false
+  let statusText = 'PLC写入失败'
+  let error = ''
+  let email = createSkippedEmailResult('MW680 尚未写入成功。')
+
+  if (isWorkOrderActive()) {
+    const blockedAt = new Date()
+    const activeWorkOrder = getWorkOrderState()
+
+    return {
+      ok: false,
+      protocol: PLC_PROTOCOL,
+      ...config,
+      statusText: '已有工单正在处理中',
+      writes: [],
+      error: '请等待当前工单完成后再发送新的工单提示。',
+      email: createSkippedEmailResult('已有工单正在处理中。'),
+      workOrder: activeWorkOrder,
+      startedAt: startedAt.toISOString(),
+      completedAt: blockedAt.toISOString(),
+      durationMs: blockedAt.getTime() - startedAt.getTime()
+    }
+  }
+
+  activePlcWriteCount += 1
+
+  try {
+    points = [createWorkOrderTriggerWritePoint()]
+
+    if (isS7Protocol()) {
+      throw new Error('当前 S7 原生协议暂不支持工单提示写入，请切换到 Modbus TCP 写入。')
+    }
+
+    await waitForPollingIdle(config.timeoutMs + 500)
+    writes = await writeModbusPointListWithConnection(config, points)
+
+    const successCount = writes.filter((write) => write.status === 'success').length
+    const failureCount = writes.filter((write) => write.status === 'error').length
+    error = getFailedWriteMessage(writes)
+    ok = successCount === points.length && failureCount === 0
+    statusText = ok ? 'PLC写入校验成功' : 'PLC写入失败'
+
+    updateState({
+      status: ok ? 'connected' : 'error',
+      statusText: ok ? '工单提示写入成功' : statusText,
+      error,
+      consecutiveFailures: ok ? 0 : state.consecutiveFailures + 1
+    })
+  } catch (writeError) {
+    error = getErrorMessage(writeError, config, points.length > 0 ? points : state.points)
+    console.error(`[PLC] 工单提示写入失败：${error}`)
+    updateState({
+      status: 'error',
+      statusText,
+      error,
+      consecutiveFailures: state.consecutiveFailures + 1
+    })
+  } finally {
+    activePlcWriteCount = Math.max(0, activePlcWriteCount - 1)
+  }
+
+  if (ok) {
+    email = await sendWorkOrderNotification()
+
+    if (email.ok) {
+      activateWorkOrderMonitoring(email)
+    }
+  }
+
+  const completedAt = new Date()
+
+  return {
+    ok,
+    protocol: PLC_PROTOCOL,
+    ...config,
+    statusText,
+    writes,
+    error,
+    email,
+    workOrder: getWorkOrderState(),
+    startedAt: startedAt.toISOString(),
+    completedAt: completedAt.toISOString(),
+    durationMs: completedAt.getTime() - startedAt.getTime()
+  }
+}
+
 export const startPlcPolling = (): void => {
   if (pollTimer) {
     return
@@ -2396,6 +2820,7 @@ export const stopPlcPolling = (): void => {
 
 export const registerPlcIpc = (): void => {
   loadPersistedPlcConfiguration()
+  loadPersistedWorkOrderState()
   ipcMain.handle('plc:get-state', () => getPlcState())
   ipcMain.handle('plc:start-polling', () => {
     startPlcPolling()
@@ -2418,4 +2843,5 @@ export const registerPlcIpc = (): void => {
   ipcMain.handle('plc:write-dashboard-date', (_event, input: unknown) =>
     writeDashboardDateToPlc(input)
   )
+  ipcMain.handle('plc:write-work-order-trigger', () => writeWorkOrderTriggerToPlc())
 }

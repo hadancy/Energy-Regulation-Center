@@ -136,7 +136,7 @@ AI-Prediction/
 | 08-03 | 1 |
 | 01-03 | 2 |
 
-选中天气记录后，数据会同时传递给环境面板和能源预测面板。设备维保日期保存在渲染进程 `localStorage` 的 `energy-dashboard:last-maintenance-date` 中，维保百分比按 180 天周期递减。
+选中天气记录后，数据会同时传递给环境面板和能源预测面板。设备维保日期保存在渲染进程 `localStorage` 的 `energy-dashboard:last-maintenance-date` 中；点击“已维保”时记录左上角当前选中的日期，切换日期后以新的选中日期重新计算，维保百分比按 180 天周期递减。
 
 ### 6.2 天气模型
 

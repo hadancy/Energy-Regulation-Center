@@ -25,6 +25,8 @@ const api = {
       ipcRenderer.invoke('plc:write-traffic', value),
     writeDashboardDate: (value: number): Promise<PlcDashboardDateWriteResult> =>
       ipcRenderer.invoke('plc:write-dashboard-date', value),
+    writeWorkOrderTrigger: (): Promise<PlcWorkOrderTriggerWriteResult> =>
+      ipcRenderer.invoke('plc:write-work-order-trigger'),
     onUpdate: (callback: (state: PlcState) => void) => {
       const listener = (_event: IpcRendererEvent, state: PlcState): void => {
         callback(state)
@@ -57,6 +59,12 @@ const api = {
       ipcRenderer.invoke('external-app:save-settings', settings),
     launch: (): Promise<ExternalAppActionResult> => ipcRenderer.invoke('external-app:launch')
   },
+  email: {
+    getSettings: (): Promise<EmailSettings> => ipcRenderer.invoke('email:get-settings'),
+    saveSettings: (input: EmailSettingsInput): Promise<EmailSettings> =>
+      ipcRenderer.invoke('email:save-settings', input),
+    test: (): Promise<EmailSendResult> => ipcRenderer.invoke('email:test')
+  },
   window: {
     getFullscreen: (): Promise<boolean> => ipcRenderer.invoke('window:get-fullscreen'),
     toggleFullscreen: (): Promise<boolean> => ipcRenderer.invoke('window:toggle-fullscreen'),
@@ -84,6 +92,44 @@ interface ExternalAppActionResult {
   settings: ExternalAppSettings
   error: string
   action?: 'launched' | 'activated' | 'already-running'
+}
+
+interface EmailRecipient {
+  id: string
+  name: string
+  email: string
+}
+
+interface EmailSettings {
+  smtpHost: string
+  smtpPort: number
+  secure: boolean
+  user: string
+  senderName: string
+  hasAuthorizationCode: boolean
+  recipients: EmailRecipient[]
+  updatedAt: string
+}
+
+interface EmailSettingsInput {
+  smtpHost: string
+  smtpPort: number
+  secure: boolean
+  user: string
+  authorizationCode?: string
+  senderName: string
+  recipients: EmailRecipient[]
+}
+
+interface EmailSendResult {
+  ok: boolean
+  skipped: boolean
+  statusText: string
+  error: string
+  accepted: string[]
+  rejected: string[]
+  messageId: string
+  sentAt: string
 }
 
 interface WeatherRecordInput {
@@ -238,6 +284,30 @@ interface PlcWeatherWriteResult {
 type PlcTrafficWriteResult = PlcWeatherWriteResult
 type PlcDashboardDateWriteResult = PlcWeatherWriteResult
 
+type PlcWorkOrderStatus = 'idle' | 'monitoring' | 'completion-email-pending' | 'completed'
+
+interface PlcWorkOrderState {
+  status: PlcWorkOrderStatus
+  statusText: string
+  workOrderNumber: string
+  startedAt: string
+  notificationEmailSentAt: string
+  notificationEmailMessageId: string
+  completedAt: string
+  completionEmailSentAt: string
+  completionEmailMessageId: string
+  completionEmailAttemptCount: number
+  lastCompletionEmailAttemptAt: string
+  lastCheckedAt: string
+  lastValue: number | null
+  lastError: string
+}
+
+interface PlcWorkOrderTriggerWriteResult extends PlcWeatherWriteResult {
+  email: EmailSendResult
+  workOrder: PlcWorkOrderState
+}
+
 interface PlcState {
   protocol: string
   brand: string
@@ -264,6 +334,7 @@ interface PlcState {
   lastUpdatedTimestamp: number
   error: string
   consecutiveFailures: number
+  workOrder: PlcWorkOrderState
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -5,8 +5,9 @@ import icon from '../../resources/icon.png?asset'
 import { registerCameraIpc, startCameraProxy, stopCameraProxy } from './camera'
 import { closeWeatherDatabase } from './database/weatherRepository'
 import { registerWeatherIpc } from './database/weatherIpc'
-import { registerPlcIpc, stopPlcPolling } from './plc'
+import { registerPlcIpc, stopPlcPolling, stopWorkOrderMonitoring } from './plc'
 import { registerExternalAppIpc } from './externalApp'
+import { registerEmailIpc } from './email'
 
 function createWindow(): void {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
@@ -86,6 +87,7 @@ app.whenReady().then(async () => {
   registerWeatherIpc()
   registerPlcIpc()
   registerExternalAppIpc()
+  registerEmailIpc()
 
   ipcMain.handle('window:get-fullscreen', (event) => {
     return BrowserWindow.fromWebContents(event.sender)?.isFullScreen() ?? false
@@ -122,6 +124,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   stopCameraProxy()
   stopPlcPolling()
+  stopWorkOrderMonitoring()
   closeWeatherDatabase()
 })
 

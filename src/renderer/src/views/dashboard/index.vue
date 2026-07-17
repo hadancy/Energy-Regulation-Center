@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import {
   Back,
+  Bell,
   Calendar,
   FullScreen,
   Monitor,
@@ -42,9 +43,14 @@ const isDashboardDateWriting = ref(false)
 const externalAppSettings = ref({ path: '', name: '' })
 const isExternalAppLaunching = ref(false)
 const isFullscreen = ref(false)
+const isWorkOrderTriggerWriting = ref(false)
+type PlcState = Awaited<ReturnType<typeof window.api.plc.getState>>
+type PlcWorkOrderState = PlcState['workOrder']
+const workOrderState = ref<PlcWorkOrderState | null>(null)
 
 let clockTimer: number | null = null
 let unsubscribeFullscreenChanged: (() => void) | null = null
+let unsubscribePlcUpdate: (() => void) | null = null
 
 type WeatherSeason = Parameters<typeof window.api.weather.forecast>[0]['season']
 type WeatherRecord = Awaited<ReturnType<typeof window.api.weather.forecast>>[number]
@@ -54,6 +60,17 @@ const selectedSeason = computed<WeatherSeason>(() =>
   getSeasonByMonth(selectedDate.value.getMonth() + 1)
 )
 const selectedWeatherRecord = ref<WeatherRecord | null>(null)
+const isWorkOrderActive = computed(() => {
+  const status = workOrderState.value?.status
+  return status === 'monitoring' || status === 'completion-email-pending'
+})
+const workOrderButtonText = computed(() => {
+  if (isWorkOrderTriggerWriting.value) return '发送中'
+  if (workOrderState.value?.status === 'completion-email-pending') return '完成邮件重试中'
+  if (workOrderState.value?.status === 'monitoring') return '工单处理中'
+  if (workOrderState.value?.status === 'completed') return '新建工单提示'
+  return '工单提示'
+})
 
 const formattedWeek = computed(() => {
   const weekNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
@@ -105,6 +122,23 @@ const launchExternalApp = async (): Promise<void> => {
     ElMessage.error(getErrorMessage(error, '软件启动失败'))
   } finally {
     isExternalAppLaunching.value = false
+  }
+}
+
+const sendWorkOrderTrigger = async (): Promise<void> => {
+  if (isWorkOrderTriggerWriting.value) {
+    return
+  }
+
+  isWorkOrderTriggerWriting.value = true
+
+  try {
+    const result = await window.api.plc.writeWorkOrderTrigger()
+    workOrderState.value = result.workOrder
+  } catch (error) {
+    console.error('[工单] 工单提示发送失败', error)
+  } finally {
+    isWorkOrderTriggerWriting.value = false
   }
 }
 
@@ -261,6 +295,16 @@ onMounted(async () => {
     isFullscreen.value = fullscreen
   })
 
+  unsubscribePlcUpdate = window.api.plc.onUpdate((plcState) => {
+    workOrderState.value = plcState.workOrder
+  })
+
+  try {
+    workOrderState.value = (await window.api.plc.getState()).workOrder
+  } catch {
+    workOrderState.value = null
+  }
+
   await writeInitialDashboardDate()
 
   try {
@@ -284,6 +328,8 @@ onBeforeUnmount(() => {
 
   unsubscribeFullscreenChanged?.()
   unsubscribeFullscreenChanged = null
+  unsubscribePlcUpdate?.()
+  unsubscribePlcUpdate = null
 })
 </script>
 
@@ -333,6 +379,19 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="topbar-side topbar-side--right">
+          <button
+            class="dashboard-back-button dashboard-work-order-button app-no-drag"
+            :class="{ 'is-work-order-active': isWorkOrderActive }"
+            type="button"
+            :disabled="isWorkOrderTriggerWriting || isWorkOrderActive"
+            :aria-label="workOrderButtonText"
+            @click="sendWorkOrderTrigger"
+          >
+            <el-icon>
+              <Bell />
+            </el-icon>
+            <span>{{ workOrderButtonText }}</span>
+          </button>
           <button
             class="dashboard-back-button dashboard-app-button app-no-drag"
             type="button"
@@ -393,7 +452,10 @@ onBeforeUnmount(() => {
 
         <aside class="grid min-h-0 grid-rows-[32fr_70fr] gap-[0.8vh]">
           <DeviceStatusPanel />
-          <EnergyPredictionPanel :selected-weather-record="selectedWeatherRecord" />
+          <EnergyPredictionPanel
+            :selected-weather-record="selectedWeatherRecord"
+            :selected-date="selectedDate"
+          />
         </aside>
       </section>
     </div>
@@ -715,6 +777,30 @@ onBeforeUnmount(() => {
 .dashboard-back-button:disabled {
   cursor: wait;
   opacity: 0.68;
+  transform: none;
+}
+
+.dashboard-back-button.is-work-order-active {
+  border-color: rgba(250, 204, 21, 0.72);
+  color: #fef9c3;
+  cursor: progress;
+  opacity: 0.92;
+  background: linear-gradient(180deg, rgba(202, 138, 4, 0.28), rgba(51, 33, 3, 0.72));
+  box-shadow:
+    inset 0 0 0.85rem rgba(250, 204, 21, 0.13),
+    0 0 0.8rem rgba(234, 179, 8, 0.14);
+}
+
+.dashboard-work-order-button,
+.dashboard-work-order-button:hover,
+.dashboard-work-order-button:active,
+.dashboard-work-order-button:disabled,
+.dashboard-work-order-button.is-work-order-active {
+  border-color: transparent;
+  color: transparent;
+  opacity: 0;
+  background: transparent;
+  box-shadow: none;
   transform: none;
 }
 
